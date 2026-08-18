@@ -1,4 +1,4 @@
-# neues-projekt
+# strwo
 
 Kurzbeschreibung folgt.
 
