@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import type { ReactElement } from 'react'
 
 import { Sparkline } from '@/components/charts/sparkline'
@@ -27,7 +28,7 @@ import {
   weeklyVolume,
   type SeriesPoint,
 } from '@/lib/analytics'
-import { IS_MOCK_DATA, getRepository } from '@/lib/data'
+import { IS_MOCK_DATA, getRepository, isEmptyState } from '@/lib/data'
 import { addDays, fromDayKey, lastWeekRanges, previousRange, toDayKey, weekRange } from '@/lib/date'
 import type { Activity, DateRange } from '@/lib/domain/types'
 import {
@@ -52,6 +53,12 @@ import {
  * All reads happen here, in one server pass; the interactive panels below are
  * client components that only switch between values they were already handed.
  */
+
+/**
+ * Reads the record store, which a sync rewrites at runtime. Prerendering it
+ * would freeze yesterday's numbers into the build.
+ */
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Übersicht · strwo',
@@ -84,6 +91,32 @@ function byMostRecent(a: Activity, b: Activity): number {
 }
 
 export default async function OverviewPage(): Promise<ReactElement> {
+  // Nothing synced yet: a wall of zeroes would read as "you trained nothing",
+  // which is a different statement from "there is no data".
+  if (isEmptyState()) {
+    return (
+      <div className="flex flex-col gap-6 sm:gap-8">
+        <PageHeader title="Übersicht" />
+        <Card>
+          <div className="flex flex-col gap-3 p-1">
+            <h2 className="text-base font-semibold text-ink">Noch keine Daten</h2>
+            <p className="max-w-prose text-sm text-ink-secondary">
+              Es wurde noch keine Datenquelle synchronisiert. Verbinde WHOOP oder Wahoo und starte
+              den ersten Abgleich — danach stehen hier deine Wochenwerte, Trainingszonen und der
+              HRV-Verlauf.
+            </p>
+            <Link
+              href="/einstellungen"
+              className="w-fit rounded-lg border border-border-strong bg-surface-2 px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-series-1"
+            >
+              Zu den Datenquellen
+            </Link>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
   const repository = getRepository()
   const today = new Date()
   const todayKey = toDayKey(today)

@@ -1,9 +1,11 @@
 import type { ReactElement } from 'react'
 
 import { Badge, type BadgeTone } from '@/components/ui/badge'
+import { DataSourceActions } from '@/components/settings/data-source-actions'
+import { SyncPanel } from '@/components/settings/sync-panel'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import type { DataSourceStatus, ProviderCapabilities } from '@/lib/domain/types'
+import type { DataSourceStatus, ProviderCapabilities, ProviderId } from '@/lib/domain/types'
 import { NO_DATA, formatDateTime } from '@/lib/format'
 
 /**
@@ -11,11 +13,17 @@ import { NO_DATA, formatDateTime } from '@/lib/format'
  * point of this card — a source that has no power data should say so here,
  * before a panel elsewhere shows "keine Daten" and leaves the reason open.
  *
- * None of the connections exist yet, so every button is disabled and says why.
+ * WHOOP and Wahoo have adapters and can be connected; the rest are listed so
+ * the planned coverage is visible, with their buttons disabled.
  */
 
 const HEADING_ID = 'datenquellen-titel'
-const CONNECT_HINT_ID = 'datenquellen-hinweis'
+
+/** Platforms with a working adapter. Everything else cannot be connected yet. */
+const CONNECTABLE: Partial<Record<ProviderId, readonly [string, string]>> = {
+  whoop: ['WHOOP_CLIENT_ID', 'WHOOP_CLIENT_SECRET'],
+  wahoo: ['WAHOO_CLIENT_ID', 'WAHOO_CLIENT_SECRET'],
+}
 
 const CAPABILITY_LABELS: Record<keyof ProviderCapabilities, string> = {
   activities: 'Aktivitäten',
@@ -86,6 +94,7 @@ export function DataSourcesCard({ sources }: DataSourcesCardProps): ReactElement
           <ul className="flex flex-col">
             {sources.map((source) => {
               const status = statusLabel(source)
+              const envVars = CONNECTABLE[source.provider]
               const provides = capabilityKeys(source.capabilities, true)
               const missing = capabilityKeys(source.capabilities, false)
 
@@ -108,14 +117,14 @@ export function DataSourcesCard({ sources }: DataSourcesCardProps): ReactElement
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled
-                      aria-describedby={CONNECT_HINT_ID}
-                      className="shrink-0 rounded-lg border border-border-hair px-3 py-1.5 text-sm text-ink-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Verbinden
-                    </button>
+                    <DataSourceActions
+                      provider={source.provider}
+                      label={source.label}
+                      connected={source.connected}
+                      configured={source.configured}
+                      connectable={envVars !== undefined}
+                      {...(envVars === undefined ? {} : { envVars })}
+                    />
                   </div>
 
                   {provides.length === 0 ? (
@@ -144,10 +153,7 @@ export function DataSourcesCard({ sources }: DataSourcesCardProps): ReactElement
           </ul>
         )}
 
-        <p id={CONNECT_HINT_ID} className="text-xs text-ink-muted">
-          Das Verbinden der Datenquellen folgt in einem späteren Schritt — bis dahin bleiben die
-          Schaltflächen deaktiviert.
-        </p>
+        <SyncPanel />
       </CardBody>
     </Card>
   )

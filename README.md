@@ -94,16 +94,31 @@ The same session imported from two platforms is merged in
 minutes), preferring Wahoo's distance and power and WHOOP's zone durations and
 load.
 
-WHOOP v2 and Wahoo Cloud API v1 adapters are written and endpoint-verified but
-not yet wired to token storage — that is Phase 3.
+### Connecting WHOOP and Wahoo
+
+Register an app at [developer.whoop.com](https://developer.whoop.com) and at
+[developers.wahooligan.com](https://developers.wahooligan.com/applications/new),
+then put the credentials in `.env.local` and restart the server:
 
 ```
-# .env.local
 WHOOP_CLIENT_ID=…
 WHOOP_CLIENT_SECRET=…
 WAHOO_CLIENT_ID=…
 WAHOO_CLIENT_SECRET=…
 ```
+
+The redirect URIs to register are `http://localhost:3000/api/auth/whoop/callback`
+and `http://localhost:3000/api/auth/wahoo/callback` — they must match exactly.
+WHOOP additionally needs the `offline` scope, or it issues no refresh token; the
+adapter already requests it.
+
+Then *Einstellungen → Datenquellen → Verbinden*, and *Jetzt synchronisieren*
+pulls the last 120 days. Tokens and records land in `data/` (gitignored, written
+with mode 0600); disconnecting deletes both the tokens and that provider's rows.
+
+Storage lives behind the same `HealthDataRepository`, so `data/index.ts` still
+decides everything: `STRWO_DATA_SOURCE` is `local` (default), `mock` for the
+generated demo history, and `supabase` once that repository exists.
 
 ### Derived vs. provider metrics
 
@@ -145,8 +160,11 @@ activity feed and activity detail.
 **Phase 2.** Deeper activity analytics, richer calendar interactions, saved
 custom periods.
 
-**Phase 3.** Real integrations, starting with WHOOP (HRV, sleep, recovery,
-zones) and Wahoo (distance, elevation, power): token storage, sync jobs,
-webhooks.
+**Phase 3 — done.** WHOOP and Wahoo connect over OAuth, tokens are stored and
+refreshed locally, and a sync writes normalized records that the pages read
+through `LocalRepository`. Webhooks and per-second activity streams are not
+implemented: Wahoo delivers streams only inside the FIT file, which the adapter
+does not download yet, so activity detail charts stay empty for synced rides
+until it does.
 
 **Phase 4.** Advanced analytics and insights on top of continuous data.

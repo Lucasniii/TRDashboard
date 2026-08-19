@@ -18,6 +18,12 @@ import { IS_MOCK_DATA, getRepository } from '@/lib/data'
 import { fromDayKey, lastWeekRanges } from '@/lib/date'
 import { formatDateRangeLabel, formatNumber } from '@/lib/format'
 
+/**
+ * Reads the record store, which a sync rewrites at runtime. Prerendering it
+ * would freeze yesterday's numbers into the build.
+ */
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Training · strwo',
   description: 'Wochenübersicht, Trainingsbelastung und Zonenverteilung',

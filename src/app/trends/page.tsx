@@ -6,6 +6,12 @@ import { TrendsExplorer } from '@/components/trends/trends-explorer'
 import { getRepository } from '@/lib/data'
 import { periodToRange, toDayKey } from '@/lib/date'
 
+/**
+ * Reads the record store, which a sync rewrites at runtime. Prerendering it
+ * would freeze yesterday's numbers into the build.
+ */
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Trends · strwo',
   description: 'Training und Gesundheit über eine gemeinsame Zeitachse',

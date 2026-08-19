@@ -11,7 +11,11 @@ import {
   buildPowerZones,
 } from '@/components/settings/zone-math'
 import { getRepository } from '@/lib/data'
-import type { UserSettings, WeeklyGoals } from '@/lib/domain/types'
+import type { ProviderId, UserSettings, WeeklyGoals } from '@/lib/domain/types'
+import { getAdapter, getProviderLabel } from '@/lib/providers/registry'
+import { deleteByProvider } from '@/lib/store/records'
+import { clearConnection, connectionStates, isConnected } from '@/lib/store/tokens'
+import { syncAllConnected, syncProvider, type SyncOutcome } from '@/lib/sync/run-sync'
 
 /**
  * The one write path of the settings page. Both forms — Wochenziele and
@@ -205,4 +209,115 @@ export async function saveSettingsAction(
   revalidatePath('/einstellungen')
 
   return { ok: true, message: 'Änderungen gespeichert.' }
+}
+
+// ── Datenquellen ───────────────────────────────────────────────────────────
+//
+// Connecting is a redirect (a link to /api/auth/<provider>), so it needs no
+// action. Syncing and disconnecting do: both write on the server and both have
+// to invalidate the pages that read the records afterwards.
+
+/** One provider's outcome, already carrying its German label for the UI. */
+export interface SyncResultRow {
+  provider: ProviderId
+  label: string
+  status: 'succeeded' | 'failed' | 'skipped'
+  counts: {
+    activities: number
+    dailyHealth: number
+    sleep: number
+    recovery: number
+  }
+  /** German sentence for a failed or skipped run, null on success. */
+  error: string | null
+}
+
+export type SyncActionResult =
+  | { ok: true; rows: SyncResultRow[] }
+  | { ok: false; message: string }
+
+export type DisconnectActionResult = { ok: boolean; message: string }
+
+/**
+ * A server action is a public endpoint, so the provider id is validated here
+ * rather than trusted from the caller. Only providers with an adapter can run.
+ */
+function parseProvider(value: unknown): ProviderId | null {
+  if (value !== 'whoop' && value !== 'wahoo') return null
+  return getAdapter(value) === null ? null : value
+}
+
+function toRow(outcome: SyncOutcome): SyncResultRow {
+  return {
+    provider: outcome.provider,
+    label: getProviderLabel(outcome.provider),
+    status: outcome.status,
+    counts: { ...outcome.counts },
+    error: outcome.error,
+  }
+}
+
+/** Records live under every page, so a run that wrote anything invalidates both. */
+function revalidateAfterStoreWrite(): void {
+  revalidatePath('/einstellungen')
+  revalidatePath('/')
+}
+
+/**
+ * Runs one provider, or every connected provider when none is named. A run that
+ * started and failed is `ok: true` with a failed row — the user asked for a
+ * sync and got one; only an impossible request is `ok: false`.
+ */
+export async function runSyncAction(provider?: ProviderId): Promise<SyncActionResult> {
+  let outcomes: SyncOutcome[]
+
+  if (provider === undefined) {
+    const states = connectionStates()
+    if (!Object.values(states).some((state) => state?.connected === true)) {
+      return {
+        ok: false,
+        message: 'Es ist keine Datenquelle verbunden. Bitte zuerst WHOOP oder Wahoo verbinden.',
+      }
+    }
+    outcomes = await syncAllConnected()
+  } else {
+    const target = parseProvider(provider)
+    if (target === null) {
+      return { ok: false, message: 'Diese Datenquelle lässt sich nicht synchronisieren.' }
+    }
+    if (!isConnected(target)) {
+      return {
+        ok: false,
+        message: `${getProviderLabel(target)} ist nicht verbunden. Bitte zuerst verbinden.`,
+      }
+    }
+    outcomes = [await syncProvider(target)]
+  }
+
+  revalidateAfterStoreWrite()
+
+  return { ok: true, rows: outcomes.map(toRow) }
+}
+
+/**
+ * Disconnecting drops the tokens and every record that provider delivered.
+ * Keeping the rows would keep showing data the user believes they revoked.
+ */
+export async function disconnectAction(provider: ProviderId): Promise<DisconnectActionResult> {
+  const target = parseProvider(provider)
+  if (target === null) {
+    return { ok: false, message: 'Diese Datenquelle lässt sich nicht trennen.' }
+  }
+
+  const label = getProviderLabel(target)
+  clearConnection(target)
+  const removed = deleteByProvider(target)
+
+  revalidateAfterStoreWrite()
+
+  if (removed === 0) {
+    return { ok: true, message: `${label} wurde getrennt. Es waren keine Daten gespeichert.` }
+  }
+  const records = removed === 1 ? '1 Datensatz' : `${String(removed)} Datensätze`
+  return { ok: true, message: `${label} wurde getrennt, ${records} wurden gelöscht.` }
 }

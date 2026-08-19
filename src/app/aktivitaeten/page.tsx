@@ -12,6 +12,12 @@ import { addDays, toDayKey } from '@/lib/date'
  * request. Grouping, totals and formatting all happen against the same list.
  */
 
+/**
+ * Reads the record store, which a sync rewrites at runtime. Prerendering it
+ * would freeze yesterday's numbers into the build.
+ */
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Aktivitäten · strwo',
 }

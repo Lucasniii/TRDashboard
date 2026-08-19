@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactElement } from 'react'
 
 import { AppearanceCard } from '@/components/settings/appearance-card'
+import { ConnectionBanner } from '@/components/settings/connection-banner'
 import { DataSourcesCard } from '@/components/settings/data-sources-card'
 import { TrainingZonesCard } from '@/components/settings/training-zones-card'
 import { WeeklyGoalsCard } from '@/components/settings/weekly-goals-card'
@@ -20,12 +21,24 @@ export const metadata: Metadata = {
   description: 'Wochenziele, Trainingszonen, Datenquellen und Darstellung',
 }
 
-export default async function SettingsPage(): Promise<ReactElement> {
+/** The OAuth routes redirect back here with their outcome in the query. */
+interface SettingsSearchParams {
+  verbunden?: string
+  fehler?: string
+  quelle?: string
+}
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SettingsSearchParams>
+}): Promise<ReactElement> {
   const repository = getRepository()
 
-  const [settings, dataSources] = await Promise.all([
+  const [settings, dataSources, params] = await Promise.all([
     repository.getSettings(),
     repository.getDataSources(),
+    searchParams,
   ])
 
   return (
@@ -34,6 +47,12 @@ export default async function SettingsPage(): Promise<ReactElement> {
         title="Einstellungen"
         subline="Wochenziele, Trainingszonen, Datenquellen und Darstellung"
         {...(IS_MOCK_DATA ? { action: <Badge tone="warning">Demodaten</Badge> } : {})}
+      />
+
+      <ConnectionBanner
+        {...(params.verbunden === undefined ? {} : { connected: params.verbunden })}
+        {...(params.fehler === undefined ? {} : { error: params.fehler })}
+        {...(params.quelle === undefined ? {} : { source: params.quelle })}
       />
 
       <WeeklyGoalsCard goals={settings.weeklyGoals} />
