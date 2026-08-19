@@ -21,7 +21,7 @@ import type { ActivityType } from '@/lib/domain/types'
 import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
 
 export const metadata: Metadata = {
-  title: 'Kalender · strwo',
+  title: 'Kalender · TRDashboard',
 }
 
 interface KalenderPageProps {

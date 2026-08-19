@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: ActivityDetailPageProps): Pro
   const { id } = await params
   const detail = await getRepository().getActivityById(id)
   return {
-    title: detail === null ? 'Aktivität nicht gefunden · strwo' : `${detail.activity.name} · strwo`,
+    title: detail === null ? 'Aktivität nicht gefunden · TRDashboard' : `${detail.activity.name} · TRDashboard`,
   }
 }
 

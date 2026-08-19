@@ -1,6 +1,6 @@
-# strwo — Datenschutzerklärung
+# TRDashboard — Datenschutzerklärung
 
-strwo ist ein privates Dashboard für die eigenen Trainings- und Gesundheitsdaten.
+TRDashboard ist ein privates Dashboard für die eigenen Trainings- und Gesundheitsdaten.
 Es wird von einer einzelnen Person für sich selbst betrieben und steht keinem
 weiteren Nutzerkreis offen.
 

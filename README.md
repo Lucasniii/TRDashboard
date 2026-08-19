@@ -1,4 +1,4 @@
-# strwo
+# TRDashboard
 
 A personal cycling, training, recovery and health dashboard. The interface is
 German (`de-AT`, metric); the code, data model and documentation are English.
@@ -117,7 +117,7 @@ pulls the last 120 days. Tokens and records land in `data/` (gitignored, written
 with mode 0600); disconnecting deletes both the tokens and that provider's rows.
 
 Storage lives behind the same `HealthDataRepository`, so `data/index.ts` still
-decides everything: `STRWO_DATA_SOURCE` is `local` (default), `mock` for the
+decides everything: `TRDASHBOARD_DATA_SOURCE` is `local` (default), `mock` for the
 generated demo history, and `supabase` once that repository exists.
 
 ### Derived vs. provider metrics

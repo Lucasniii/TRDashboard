@@ -17,7 +17,7 @@ import { IS_MOCK_DATA, getRepository } from '@/lib/data'
  */
 
 export const metadata: Metadata = {
-  title: 'Einstellungen · strwo',
+  title: 'Einstellungen · TRDashboard',
   description: 'Wochenziele, Trainingszonen, Datenquellen und Darstellung',
 }
 

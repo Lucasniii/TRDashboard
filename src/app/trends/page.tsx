@@ -13,7 +13,7 @@ import { periodToRange, toDayKey } from '@/lib/date'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Trends · strwo',
+  title: 'Trends · TRDashboard',
   description: 'Training und Gesundheit über eine gemeinsame Zeitachse',
 }
 

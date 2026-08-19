@@ -10,7 +10,7 @@ import { createState } from '@/lib/store/oauth-state'
  * only exist after the callback.
  *
  * The redirect URI is derived from the request origin so the flow works on
- * whatever port `next dev` picked; STRWO_BASE_URL overrides it for a tunnel or
+ * whatever port `next dev` picked; TRDASHBOARD_BASE_URL overrides it for a tunnel or
  * a deployment, because it has to match the URI registered with the provider
  * character for character.
  */
@@ -24,7 +24,7 @@ function parseProvider(value: string): ProviderId | null {
 }
 
 function resolveBaseUrl(requestUrl: string): string {
-  const configured = process.env.STRWO_BASE_URL?.trim() ?? ''
+  const configured = process.env.TRDASHBOARD_BASE_URL?.trim() ?? ''
   if (configured !== '') return configured.replace(/\/+$/, '')
   return new URL(requestUrl).origin
 }

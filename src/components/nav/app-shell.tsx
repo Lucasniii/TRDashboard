@@ -21,7 +21,7 @@ import { ThemeToggle } from '@/components/nav/theme-toggle'
 
 function Wordmark({ className = '' }: { className?: string }): ReactElement {
   return (
-    <span className={`text-lg font-semibold tracking-tight text-ink ${className}`}>strwo</span>
+    <span className={`text-lg font-semibold tracking-tight text-ink ${className}`}>TRDashboard</span>
   )
 }
 

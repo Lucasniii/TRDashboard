@@ -19,7 +19,7 @@ import { addDays, toDayKey } from '@/lib/date'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Aktivitäten · strwo',
+  title: 'Aktivitäten · TRDashboard',
 }
 
 export default async function ActivitiesPage(): Promise<ReactElement> {

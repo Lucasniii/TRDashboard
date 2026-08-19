@@ -12,7 +12,7 @@ import { useCallback, useSyncExternalStore, type ReactElement } from 'react'
 
 export type ThemeChoice = 'light' | 'dark' | 'system'
 
-const STORAGE_KEY = 'strwo-theme'
+const STORAGE_KEY = 'trdashboard-theme'
 const ORDER: readonly ThemeChoice[] = ['light', 'dark', 'system']
 
 const LABELS: Record<ThemeChoice, string> = {

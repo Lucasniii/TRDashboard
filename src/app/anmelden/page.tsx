@@ -13,7 +13,7 @@ import { isProviderConfigured } from '@/lib/providers/registry'
 import { isConnected } from '@/lib/store/tokens'
 
 /**
- * The sign-in screen. There is no strwo account: signing in means authorising
+ * The sign-in screen. There is no TRDashboard account: signing in means authorising
  * WHOOP or Wahoo, and the provider account is the identity. The first sync runs
  * inside the callback, so this is the only step the user performs.
  */
@@ -21,7 +21,7 @@ import { isConnected } from '@/lib/store/tokens'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Anmelden · strwo',
+  title: 'Anmelden · TRDashboard',
   description: 'Mit WHOOP oder Wahoo anmelden',
 }
 
@@ -79,7 +79,7 @@ export default async function SignInPage({
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <PageHeader
         title="Anmelden"
-        subline="Melde dich mit WHOOP oder Wahoo an — ein eigenes strwo-Konto gibt es nicht."
+        subline="Melde dich mit WHOOP oder Wahoo an — ein eigenes TRDashboard-Konto gibt es nicht."
         {...(IS_MOCK_DATA ? { action: <Badge tone="warning">Demodaten</Badge> } : {})}
       />
 
@@ -96,7 +96,7 @@ export default async function SignInPage({
               daran nichts.
             </p>
             <p className="text-sm text-ink-secondary">
-              Setze <code>STRWO_DATA_SOURCE=local</code> in <code>.env.local</code> und starte den
+              Setze <code>TRDASHBOARD_DATA_SOURCE=local</code> in <code>.env.local</code> und starte den
               Server neu, damit deine echten Daten angezeigt werden.
             </p>
           </div>
@@ -148,7 +148,7 @@ export default async function SignInPage({
 
       {anyConfigured ? (
         <p className="text-sm text-ink-muted">
-          Nach der Freigabe holt strwo einmalig die Daten der letzten 120 Tage. Das dauert einen
+          Nach der Freigabe holt TRDashboard einmalig die Daten der letzten 120 Tage. Das dauert einen
           Moment — danach landest du direkt auf der Übersicht.
         </p>
       ) : null}

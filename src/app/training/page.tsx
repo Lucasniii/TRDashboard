@@ -25,7 +25,7 @@ import { formatDateRangeLabel, formatNumber } from '@/lib/format'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Training · strwo',
+  title: 'Training · TRDashboard',
   description: 'Wochenübersicht, Trainingsbelastung und Zonenverteilung',
 }
 

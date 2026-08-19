@@ -1,4 +1,4 @@
--- strwo — Postgres / Supabase schema
+-- TRDashboard — Postgres / Supabase schema
 --
 -- Phase 1 runs entirely on the in-memory mock repository; this file is the
 -- target the repository interface is designed against. It is written so it can

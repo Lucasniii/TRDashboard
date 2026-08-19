@@ -28,7 +28,7 @@ function parseProvider(value: string): ProviderId | null {
 }
 
 function resolveBaseUrl(requestUrl: string): string {
-  const configured = process.env.STRWO_BASE_URL?.trim() ?? ''
+  const configured = process.env.TRDASHBOARD_BASE_URL?.trim() ?? ''
   if (configured !== '') return configured.replace(/\/+$/, '')
   return new URL(requestUrl).origin
 }

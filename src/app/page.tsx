@@ -64,7 +64,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Übersicht · strwo',
+  title: 'Übersicht · TRDashboard',
 }
 
 const HISTORY_WEEKS = 12

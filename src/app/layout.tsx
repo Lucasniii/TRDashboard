@@ -4,7 +4,7 @@ import { AppShell } from '@/components/nav/app-shell'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'strwo',
+  title: 'TRDashboard',
   description: 'Training und Gesundheit im Überblick',
 }
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
  * never renders in the wrong theme first. "system" stores no attribute, which
  * leaves the prefers-color-scheme rules in charge.
  */
-const themeScript = `(function(){try{var t=localStorage.getItem('strwo-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})();`
+const themeScript = `(function(){try{var t=localStorage.getItem('trdashboard-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}})();`
 
 export default function RootLayout({ children }: { children: ReactNode }): ReactElement {
   return (

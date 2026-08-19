@@ -66,7 +66,7 @@ import {
  */
 
 export const metadata: Metadata = {
-  title: 'Gesundheit · strwo',
+  title: 'Gesundheit · TRDashboard',
   description: 'HRV, Ruhepuls, Schlaf und Erholung im Verlauf',
 }
 

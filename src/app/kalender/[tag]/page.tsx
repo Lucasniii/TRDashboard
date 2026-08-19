@@ -31,8 +31,8 @@ interface DayPageProps {
 
 export async function generateMetadata({ params }: DayPageProps): Promise<Metadata> {
   const { tag } = await params
-  if (!isDayKey(tag)) return { title: 'Kalender · strwo' }
-  return { title: `${formatDateLong(tag)} · Kalender · strwo` }
+  if (!isDayKey(tag)) return { title: 'Kalender · TRDashboard' }
+  return { title: `${formatDateLong(tag)} · Kalender · TRDashboard` }
 }
 
 export default async function KalenderTagPage({
