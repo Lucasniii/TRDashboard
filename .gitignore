@@ -10,7 +10,10 @@ build/
 next-env.d.ts
 
 # production data / local state
-data/
+# Only ignore the runtime store at the repository root. A bare `data/` pattern
+# also matched `src/lib/data`, which meant the application's repository layer
+# could never be committed.
+/data/
 
 # environment
 .env
