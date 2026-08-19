@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import type { ReactElement } from 'react'
 
 import { Sparkline } from '@/components/charts/sparkline'
 import { HrvPanel } from '@/components/overview/hrv-panel'
 import { RecentActivities } from '@/components/overview/recent-activities'
 import { RecoveryTile } from '@/components/overview/recovery-tile'
+import { SignInResult } from '@/components/overview/sign-in-result'
 import { VolumePanel } from '@/components/overview/volume-panel'
 import { WeekGoals } from '@/components/overview/week-goals'
 import { ZonePanel } from '@/components/overview/zone-panel'
@@ -29,6 +31,7 @@ import {
   type SeriesPoint,
 } from '@/lib/analytics'
 import { IS_MOCK_DATA, getRepository, isEmptyState } from '@/lib/data'
+import { isConnected } from '@/lib/store/tokens'
 import { addDays, fromDayKey, lastWeekRanges, previousRange, toDayKey, weekRange } from '@/lib/date'
 import type { Activity, DateRange } from '@/lib/domain/types'
 import {
@@ -90,10 +93,27 @@ function byMostRecent(a: Activity, b: Activity): number {
   return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
 }
 
-export default async function OverviewPage(): Promise<ReactElement> {
-  // Nothing synced yet: a wall of zeroes would read as "you trained nothing",
-  // which is a different statement from "there is no data".
+/** Set by the OAuth callback after a successful sign-in. */
+interface OverviewSearchParams {
+  verbunden?: string
+  abgleich?: string
+}
+
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<OverviewSearchParams>
+}): Promise<ReactElement> {
+  const params = await searchParams
+
   if (isEmptyState()) {
+    // Not signed in at all: the dashboard has nothing to say yet, so send the
+    // user to the one action that changes that.
+    if (!isConnected('whoop') && !isConnected('wahoo')) redirect('/anmelden')
+
+    // Connected, but the store is empty — the first sync did not deliver.
+    // A wall of zeroes would read as "you trained nothing", which is a
+    // different statement from "there is no data".
     return (
       <div className="flex flex-col gap-6 sm:gap-8">
         <PageHeader title="Übersicht" />
@@ -101,9 +121,9 @@ export default async function OverviewPage(): Promise<ReactElement> {
           <div className="flex flex-col gap-3 p-1">
             <h2 className="text-base font-semibold text-ink">Noch keine Daten</h2>
             <p className="max-w-prose text-sm text-ink-secondary">
-              Es wurde noch keine Datenquelle synchronisiert. Verbinde WHOOP oder Wahoo und starte
-              den ersten Abgleich — danach stehen hier deine Wochenwerte, Trainingszonen und der
-              HRV-Verlauf.
+              Die Anmeldung steht, aber es wurden noch keine Datensätze übernommen. Starte den
+              Abgleich in den Einstellungen noch einmal — danach stehen hier deine Wochenwerte,
+              Trainingszonen und der HRV-Verlauf.
             </p>
             <Link
               href="/einstellungen"
@@ -214,6 +234,10 @@ export default async function OverviewPage(): Promise<ReactElement> {
           </div>
         }
       />
+
+      {params.verbunden === undefined ? null : (
+        <SignInResult provider={params.verbunden} syncFailed={params.abgleich === 'fehlgeschlagen'} />
+      )}
 
       {/* ── this week ── */}
       <section aria-labelledby="woche-titel">

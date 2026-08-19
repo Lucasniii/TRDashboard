@@ -29,8 +29,9 @@ function resolveBaseUrl(requestUrl: string): string {
   return new URL(requestUrl).origin
 }
 
+/** Problems before the redirect belong on the sign-in screen, not in settings. */
 function settingsUrl(base: string, params: Record<string, string>): string {
-  const url = new URL('/einstellungen', base)
+  const url = new URL('/anmelden', base)
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value)
   }

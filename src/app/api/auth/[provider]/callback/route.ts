@@ -4,11 +4,16 @@ import type { ProviderId } from '@/lib/domain/types'
 import { getAdapter } from '@/lib/providers/registry'
 import { consumeState } from '@/lib/store/oauth-state'
 import { saveConnection } from '@/lib/store/tokens'
+import { syncProvider } from '@/lib/sync/run-sync'
 
 /**
  * Step two: the provider sends the user back with a code. The code is traded
- * for tokens on the server and stored; the browser only ever sees
- * `/einstellungen?verbunden=<provider>`.
+ * for tokens on the server and stored; the browser only ever sees a redirect.
+ *
+ * The first sync runs here, before the redirect, so signing in is the only
+ * thing the user has to do — they land on a dashboard that already has data.
+ * It costs one wait of a few seconds; a sync that fails still counts as a
+ * successful connection and says so.
  *
  * Failures are deliberately coarse — `abgebrochen`, `sicherheitspruefung`,
  * `verbindung`. The detail of a token error can quote the request body, so it
@@ -28,8 +33,8 @@ function resolveBaseUrl(requestUrl: string): string {
   return new URL(requestUrl).origin
 }
 
-function settingsUrl(base: string, params: Record<string, string>): string {
-  const url = new URL('/einstellungen', base)
+function urlWith(base: string, path: string, params: Record<string, string>): string {
+  const url = new URL(path, base)
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value)
   }
@@ -48,8 +53,9 @@ export async function GET(
 
   const requestUrl = new URL(request.url)
   const base = resolveBaseUrl(request.url)
+  // Failures land back on the sign-in screen, which is where a retry belongs.
   const failure = (reason: string): Response =>
-    NextResponse.redirect(settingsUrl(base, { fehler: reason, quelle: provider }), 302)
+    NextResponse.redirect(urlWith(base, '/anmelden', { fehler: reason, quelle: provider }), 302)
 
   // The user declined on the provider's consent screen, or the provider
   // refused. Either way there is no code to redeem.
@@ -75,5 +81,13 @@ export async function GET(
     return failure('verbindung')
   }
 
-  return NextResponse.redirect(settingsUrl(base, { verbunden: provider }), 302)
+  // Connected either way from here on: a failed first sync is reported, not
+  // treated as a failed sign-in.
+  const outcome = await syncProvider(provider)
+  const params: Record<string, string> =
+    outcome.status === 'succeeded'
+      ? { verbunden: provider }
+      : { verbunden: provider, abgleich: 'fehlgeschlagen' }
+
+  return NextResponse.redirect(urlWith(base, '/', params), 302)
 }
