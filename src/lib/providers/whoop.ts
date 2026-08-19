@@ -223,6 +223,12 @@ export class WhoopAdapter implements ProviderAdapter {
     const workoutRecords = await getPaged<WhoopWorkoutRecord>(token, '/v2/activity/workout', params)
     const cycleRecords = await getPaged<WhoopCycleRecord>(token, '/v2/cycle', params)
 
+    // Operational diagnostics only: counts make an empty sync explainable
+    // without ever writing a token, user id, or a health record to the log.
+    console.info(
+      `WHOOP-Abruf: recovery=${recoveryRecords.length}, sleep=${sleepRecords.length}, workout=${workoutRecords.length}, cycle=${cycleRecords.length}`,
+    )
+
     const cyclesById = new Map<string, WhoopCycleRecord>()
     for (const cycle of cycleRecords) {
       if (cycle.id !== null && cycle.id !== undefined) cyclesById.set(String(cycle.id), cycle)
@@ -252,12 +258,16 @@ export class WhoopAdapter implements ProviderAdapter {
       if (metric !== null) recovery.push(metric)
     }
 
-    return {
+    const result = {
       activities,
       dailyHealth: withRespiratoryRateFromSleep(dailyHealth, sleep),
       sleep,
       recovery,
     }
+    console.info(
+      `WHOOP-Import: activities=${result.activities.length}, dailyHealth=${result.dailyHealth.length}, sleep=${result.sleep.length}, recovery=${result.recovery.length}`,
+    )
+    return result
   }
 }
 
