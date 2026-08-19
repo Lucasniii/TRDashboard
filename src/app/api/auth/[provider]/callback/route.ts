@@ -76,9 +76,16 @@ export async function GET(
     // The redirect URI has to be byte-identical to the one sent in step one.
     const tokens = await adapter.exchangeCode(code, `${base}/api/auth/${provider}/callback`)
     saveConnection(provider, tokens)
-  } catch {
-    console.error(`OAuth-Rückruf fehlgeschlagen: ${provider}`)
-    return failure('verbindung')
+  } catch (error) {
+    // The provider's own words, minus anything we sent it. A rejected client id
+    // or secret is by far the most common cause and deserves its own message,
+    // because "connection failed" sends people hunting the redirect URI instead.
+    const detail = error instanceof Error ? error.message : ''
+    const badCredentials = /invalid_client|unauthorized_client|\(401\)|\(403\)/i.test(detail)
+    console.error(
+      `OAuth-Rückruf fehlgeschlagen: ${provider} — ${badCredentials ? 'Zugangsdaten abgelehnt' : 'Token-Tausch fehlgeschlagen'}`,
+    )
+    return failure(badCredentials ? 'zugangsdaten' : 'verbindung')
   }
 
   // Connected either way from here on: a failed first sync is reported, not

@@ -16,8 +16,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   abgebrochen: 'Die Anmeldung wurde abgebrochen. Es wurde nichts verbunden.',
   sicherheitspruefung:
     'Die Sicherheitsprüfung ist fehlgeschlagen — der Rückweg passte nicht zur gestarteten Anmeldung. Bitte versuche es noch einmal.',
+  zugangsdaten:
+    'Die Anmeldung beim Anbieter hat geklappt, aber er hat Client-ID oder Secret abgelehnt. Prüfe, ob beide Werte zu derselben App im Entwicklerportal gehören — eine ID aus einer anderen App ist die häufigste Ursache.',
   verbindung:
-    'Die Verbindung ist fehlgeschlagen. Prüfe, ob die Rückruf-Adresse im Entwicklerportal exakt mit der des Servers übereinstimmt.',
+    'Der Austausch des Codes gegen ein Token ist fehlgeschlagen. Der Grund steht in der Server-Ausgabe.',
 }
 
 function providerName(value: string | undefined): string | null {
