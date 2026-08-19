@@ -65,7 +65,7 @@ export async function GET(
   }
 
   try {
-    const state = createState(provider)
+    const state = await createState(provider)
     const redirectUri = `${base}/api/auth/${provider}/callback`
     return NextResponse.redirect(adapter.getAuthorizationUrl(state, redirectUri), 302)
   } catch {

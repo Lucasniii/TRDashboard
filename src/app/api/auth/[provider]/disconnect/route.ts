@@ -30,8 +30,8 @@ export async function POST(
     return NextResponse.json({ error: 'Unbekannte Datenquelle.' }, { status: 404 })
   }
 
-  clearConnection(provider)
-  const removed = deleteByProvider(provider)
+  await clearConnection(provider)
+  const removed = await deleteByProvider(provider)
 
   // Every page reads these records, so the whole tree has to refetch.
   revalidatePath('/', 'layout')

@@ -13,7 +13,7 @@ import type {
   UserSettings,
 } from '@/lib/domain/types'
 import { DEFAULT_USER_ID } from '@/lib/providers/mapping'
-import { readDocument, writeDocument } from './file-store'
+import { readDocument, writeDocument } from './document-store'
 
 /**
  * One JSON document per collection. Records are upserted rather than appended,
@@ -90,8 +90,11 @@ function dateKey(row: Dated): string {
   return `${row.date}:${row.source.provider}`
 }
 
-function readCollection<T>(document: string, isValid: (value: unknown) => value is T): T[] {
-  const stored = readDocument<unknown[]>(document, [])
+async function readCollection<T>(
+  document: string,
+  isValid: (value: unknown) => value is T,
+): Promise<T[]> {
+  const stored = await readDocument<unknown[]>(document, [])
   if (!Array.isArray(stored)) return []
   return stored.filter(isValid)
 }
@@ -100,15 +103,15 @@ function readCollection<T>(document: string, isValid: (value: unknown) => value 
  * Read, merge and write in one call — there is no locking, so splitting this
  * across the caller would lose rows.
  */
-function upsertCollection<T extends Sourced>(
+async function upsertCollection<T extends Sourced>(
   document: string,
   isValid: (value: unknown) => value is T,
   keyOf: (row: T) => string,
   incoming: readonly T[],
-): number {
+): Promise<number> {
   if (incoming.length === 0) return 0
   const byKey = new Map<string, T>()
-  for (const row of readCollection(document, isValid)) {
+  for (const row of await readCollection(document, isValid)) {
     byKey.set(keyOf(row), row)
   }
   let written = 0
@@ -121,7 +124,7 @@ function upsertCollection<T extends Sourced>(
     byKey.set(key, row)
     written += 1
   }
-  writeDocument(document, [...byKey.values()])
+  await writeDocument(document, [...byKey.values()])
   return written
 }
 
@@ -141,40 +144,40 @@ function isRecovery(value: unknown): value is RecoveryMetric {
   return hasValidDate(value)
 }
 
-export function readActivities(): Activity[] {
+export async function readActivities(): Promise<Activity[]> {
   return readCollection(ACTIVITIES_DOCUMENT, isActivity)
 }
 
-export function readDailyHealth(): DailyHealthMetrics[] {
+export async function readDailyHealth(): Promise<DailyHealthMetrics[]> {
   return readCollection(DAILY_HEALTH_DOCUMENT, isDailyHealth)
 }
 
-export function readSleep(): SleepSession[] {
+export async function readSleep(): Promise<SleepSession[]> {
   return readCollection(SLEEP_DOCUMENT, isSleep)
 }
 
-export function readRecovery(): RecoveryMetric[] {
+export async function readRecovery(): Promise<RecoveryMetric[]> {
   return readCollection(RECOVERY_DOCUMENT, isRecovery)
 }
 
-export function upsertActivities(rows: readonly Activity[]): number {
+export async function upsertActivities(rows: readonly Activity[]): Promise<number> {
   return upsertCollection(ACTIVITIES_DOCUMENT, isActivity, sourceKey, rows)
 }
 
-export function upsertDailyHealth(rows: readonly DailyHealthMetrics[]): number {
+export async function upsertDailyHealth(rows: readonly DailyHealthMetrics[]): Promise<number> {
   return upsertCollection(DAILY_HEALTH_DOCUMENT, isDailyHealth, dateKey, rows)
 }
 
-export function upsertSleep(rows: readonly SleepSession[]): number {
+export async function upsertSleep(rows: readonly SleepSession[]): Promise<number> {
   return upsertCollection(SLEEP_DOCUMENT, isSleep, sourceKey, rows)
 }
 
-export function upsertRecovery(rows: readonly RecoveryMetric[]): number {
+export async function upsertRecovery(rows: readonly RecoveryMetric[]): Promise<number> {
   return upsertCollection(RECOVERY_DOCUMENT, isRecovery, dateKey, rows)
 }
 
 /** Disconnecting a provider removes everything it ever delivered. */
-export function deleteByProvider(provider: ProviderId): number {
+export async function deleteByProvider(provider: ProviderId): Promise<number> {
   let removed = 0
   const collections: Array<[string, (value: unknown) => value is Sourced]> = [
     [ACTIVITIES_DOCUMENT, hasValidSource],
@@ -184,25 +187,25 @@ export function deleteByProvider(provider: ProviderId): number {
   ]
   for (const entry of collections) {
     const [document, isValid] = entry
-    const rows = readCollection(document, isValid)
+    const rows = await readCollection(document, isValid)
     const kept = rows.filter((row) => row.source.provider !== provider)
     if (kept.length === rows.length) continue
     removed += rows.length - kept.length
-    writeDocument(document, kept)
+    await writeDocument(document, kept)
   }
   return removed
 }
 
-export function readSettings(): UserSettings {
-  const stored = readDocument<UserSettings>(SETTINGS_DOCUMENT, DEFAULT_SETTINGS)
+export async function readSettings(): Promise<UserSettings> {
+  const stored = await readDocument<UserSettings>(SETTINGS_DOCUMENT, DEFAULT_SETTINGS)
   if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) {
     return structuredClone(DEFAULT_SETTINGS)
   }
   return stored
 }
 
-export function writeSettings(settings: UserSettings): UserSettings {
-  writeDocument(SETTINGS_DOCUMENT, settings)
+export async function writeSettings(settings: UserSettings): Promise<UserSettings> {
+  await writeDocument(SETTINGS_DOCUMENT, settings)
   return settings
 }
 
@@ -222,23 +225,23 @@ function sortJobs(jobs: SyncJob[]): SyncJob[] {
 }
 
 /** Newest first, capped at the 50 most recent runs. */
-export function readSyncJobs(): SyncJob[] {
-  return sortJobs(readCollection(SYNC_JOBS_DOCUMENT, isSyncJob)).slice(0, MAX_SYNC_JOBS)
+export async function readSyncJobs(): Promise<SyncJob[]> {
+  return sortJobs(await readCollection(SYNC_JOBS_DOCUMENT, isSyncJob)).slice(0, MAX_SYNC_JOBS)
 }
 
 /** Also updates a job in place, so a run can go pending -> running -> succeeded. */
-export function appendSyncJob(job: SyncJob): void {
-  const existing = readCollection(SYNC_JOBS_DOCUMENT, isSyncJob).filter((row) => row.id !== job.id)
+export async function appendSyncJob(job: SyncJob): Promise<void> {
+  const existing = (await readCollection(SYNC_JOBS_DOCUMENT, isSyncJob)).filter((row) => row.id !== job.id)
   const next = sortJobs([job, ...existing]).slice(0, MAX_SYNC_JOBS)
-  writeDocument(SYNC_JOBS_DOCUMENT, next)
+  await writeDocument(SYNC_JOBS_DOCUMENT, next)
 }
 
 /** Drives the "noch keine Daten" empty state instead of an empty chart. */
-export function hasAnyRecords(): boolean {
+export async function hasAnyRecords(): Promise<boolean> {
   return (
-    readActivities().length > 0 ||
-    readDailyHealth().length > 0 ||
-    readSleep().length > 0 ||
-    readRecovery().length > 0
+    (await readActivities()).length > 0 ||
+    (await readDailyHealth()).length > 0 ||
+    (await readSleep()).length > 0 ||
+    (await readRecovery()).length > 0
   )
 }

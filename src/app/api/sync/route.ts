@@ -69,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
   let outcomes: SyncOutcome[]
 
   if (body.provider !== undefined) {
-    if (!isConnected(body.provider)) {
+    if (!(await isConnected(body.provider))) {
       return NextResponse.json(
         {
           error: `${getProviderLabel(body.provider)} ist nicht verbunden. Bitte zuerst verbinden.`,
@@ -79,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     outcomes = [await syncProvider(body.provider, body.days)]
   } else {
-    const states = connectionStates()
+    const states = await connectionStates()
     const anyConnected = Object.values(states).some((state) => state?.connected === true)
     if (!anyConnected) {
       return NextResponse.json(

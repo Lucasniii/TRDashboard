@@ -106,10 +106,10 @@ export default async function OverviewPage({
 }): Promise<ReactElement> {
   const params = await searchParams
 
-  if (isEmptyState()) {
+  if (await isEmptyState()) {
     // Not signed in at all: the dashboard has nothing to say yet, so send the
     // user to the one action that changes that.
-    if (!isConnected('whoop') && !isConnected('wahoo')) redirect('/anmelden')
+    if (!(await isConnected('whoop')) && !(await isConnected('wahoo'))) redirect('/anmelden')
 
     // Connected, but the store is empty — the first sync did not deliver.
     // A wall of zeroes would read as "you trained nothing", which is a

@@ -66,11 +66,13 @@ export default async function SignInPage({
 }): Promise<ReactElement> {
   const params = await searchParams
 
-  const rows = OPTIONS.map((option) => ({
-    ...option,
-    configured: isProviderConfigured(option.provider),
-    connected: isConnected(option.provider),
-  }))
+  const rows = await Promise.all(
+    OPTIONS.map(async (option) => ({
+      ...option,
+      configured: isProviderConfigured(option.provider),
+      connected: await isConnected(option.provider),
+    })),
+  )
 
   const anyConnected = rows.some((row) => row.connected)
   const anyConfigured = rows.some((row) => row.configured)

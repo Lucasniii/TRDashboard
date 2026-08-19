@@ -3,7 +3,7 @@
 
 import { randomBytes } from 'node:crypto'
 import type { ProviderId } from '@/lib/domain/types'
-import { readDocument, writeDocument } from './file-store'
+import { readDocument, writeDocument } from './document-store'
 
 /**
  * CSRF protection for the OAuth round trip. The route handler mints a state
@@ -34,20 +34,20 @@ function isEntry(value: unknown): value is StateEntry {
   )
 }
 
-function readEntries(now: number): StateEntry[] {
-  const stored = readDocument<unknown[]>(DOCUMENT, [])
+async function readEntries(now: number): Promise<StateEntry[]> {
+  const stored = await readDocument<unknown[]>(DOCUMENT, [])
   if (!Array.isArray(stored)) return []
   return stored.filter(isEntry).filter((entry) => now - entry.createdAt < TTL_MS)
 }
 
 /** Random, single-use, persisted with its issue time. */
-export function createState(provider: ProviderId): string {
+export async function createState(provider: ProviderId): Promise<string> {
   const now = Date.now()
   const state = randomBytes(32).toString('base64url')
   // Pruning happens on every write, so an abandoned flow cannot pile up.
-  const entries = readEntries(now)
+  const entries = await readEntries(now)
   entries.push({ provider, state, createdAt: now })
-  writeDocument(DOCUMENT, entries)
+  await writeDocument(DOCUMENT, entries)
   return state
 }
 
@@ -55,16 +55,16 @@ export function createState(provider: ProviderId): string {
  * True exactly once per state. Also prunes expired entries, so the document
  * stays small without a separate cleanup job.
  */
-export function consumeState(provider: ProviderId, state: string | null): boolean {
+export async function consumeState(provider: ProviderId, state: string | null): Promise<boolean> {
   const now = Date.now()
-  const entries = readEntries(now)
+  const entries = await readEntries(now)
   if (state === null || state.length === 0) {
     // Still worth persisting the prune we just did.
-    writeDocument(DOCUMENT, entries)
+    await writeDocument(DOCUMENT, entries)
     return false
   }
   const index = entries.findIndex((entry) => entry.provider === provider && entry.state === state)
   if (index >= 0) entries.splice(index, 1)
-  writeDocument(DOCUMENT, entries)
+  await writeDocument(DOCUMENT, entries)
   return index >= 0
 }

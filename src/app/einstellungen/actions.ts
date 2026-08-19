@@ -272,7 +272,7 @@ export async function runSyncAction(provider?: ProviderId): Promise<SyncActionRe
   let outcomes: SyncOutcome[]
 
   if (provider === undefined) {
-    const states = connectionStates()
+    const states = await connectionStates()
     if (!Object.values(states).some((state) => state?.connected === true)) {
       return {
         ok: false,
@@ -285,7 +285,7 @@ export async function runSyncAction(provider?: ProviderId): Promise<SyncActionRe
     if (target === null) {
       return { ok: false, message: 'Diese Datenquelle lässt sich nicht synchronisieren.' }
     }
-    if (!isConnected(target)) {
+    if (!(await isConnected(target))) {
       return {
         ok: false,
         message: `${getProviderLabel(target)} ist nicht verbunden. Bitte zuerst verbinden.`,
@@ -310,8 +310,8 @@ export async function disconnectAction(provider: ProviderId): Promise<Disconnect
   }
 
   const label = getProviderLabel(target)
-  clearConnection(target)
-  const removed = deleteByProvider(target)
+  await clearConnection(target)
+  const removed = await deleteByProvider(target)
 
   revalidateAfterStoreWrite()
 

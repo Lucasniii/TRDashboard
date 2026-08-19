@@ -93,23 +93,23 @@ function describeFailure(provider: ProviderId, error: unknown): string {
   return `Die Synchronisierung mit ${label} ist fehlgeschlagen: ${detail}`
 }
 
-function writeResult(result: ProviderFetchResult): SyncOutcome['counts'] {
+async function writeResult(result: ProviderFetchResult): Promise<SyncOutcome['counts']> {
   return {
-    activities: upsertActivities(result.activities),
-    dailyHealth: upsertDailyHealth(result.dailyHealth),
-    sleep: upsertSleep(result.sleep),
-    recovery: upsertRecovery(result.recovery),
+    activities: await upsertActivities(result.activities),
+    dailyHealth: await upsertDailyHealth(result.dailyHealth),
+    sleep: await upsertSleep(result.sleep),
+    recovery: await upsertRecovery(result.recovery),
   }
 }
 
-function recordJob(
+async function recordJob(
   provider: ProviderId,
   startedAt: string,
   status: SyncJob['status'],
   counts: SyncOutcome['counts'],
   error: string | null,
-): void {
-  appendSyncJob({
+): Promise<void> {
+  await appendSyncJob({
     id: randomUUID(),
     provider,
     status,
@@ -144,7 +144,7 @@ export async function syncProvider(provider: ProviderId, days?: number): Promise
     // Connected, but the token could not be renewed — a real failure, and the
     // stored connection stays in place so the user can retry or reconnect.
     const message = describeFailure(provider, error)
-    recordJob(provider, startedAt, 'failed', emptyCounts(), message)
+    await recordJob(provider, startedAt, 'failed', emptyCounts(), message)
     return { provider, status: 'failed', counts: emptyCounts(), error: message }
   }
 
@@ -156,22 +156,22 @@ export async function syncProvider(provider: ProviderId, days?: number): Promise
 
   try {
     const result = await adapter.fetch(tokens, range)
-    const counts = writeResult(result)
+    const counts = await writeResult(result)
     const finishedAt = new Date().toISOString()
-    markSynced(provider, finishedAt)
-    recordJob(provider, startedAt, 'succeeded', counts, null)
+    await markSynced(provider, finishedAt)
+    await recordJob(provider, startedAt, 'succeeded', counts, null)
     return { provider, status: 'succeeded', counts, error: null }
   } catch (error) {
     const message = describeFailure(provider, error)
     // No markSynced: a failed run must not look like fresh data.
-    recordJob(provider, startedAt, 'failed', emptyCounts(), message)
+    await recordJob(provider, startedAt, 'failed', emptyCounts(), message)
     return { provider, status: 'failed', counts: emptyCounts(), error: message }
   }
 }
 
 /** Every connected provider, in display order, one after the other. */
 export async function syncAllConnected(days?: number): Promise<SyncOutcome[]> {
-  const states = connectionStates()
+  const states = await connectionStates()
   const providers = PROVIDER_ORDER.filter(
     (id) => getAdapter(id) !== null && states[id]?.connected === true,
   )

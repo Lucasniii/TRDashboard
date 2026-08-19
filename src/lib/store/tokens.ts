@@ -4,7 +4,7 @@
 import type { ProviderId } from '@/lib/domain/types'
 import { getAdapter } from '@/lib/providers/registry'
 import type { ProviderTokens } from '@/lib/providers/types'
-import { readDocument, writeDocument } from './file-store'
+import { readDocument, writeDocument } from './document-store'
 
 /**
  * The connection book: which providers are linked, with which tokens and when
@@ -56,8 +56,8 @@ function isConnectionRecord(value: unknown): value is ConnectionRecord {
   )
 }
 
-function readAll(): ConnectionDocument {
-  const stored = readDocument<Record<string, unknown>>(DOCUMENT, {})
+async function readAll(): Promise<ConnectionDocument> {
+  const stored = await readDocument<Record<string, unknown>>(DOCUMENT, {})
   if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {}
   const document: ConnectionDocument = {}
   for (const [provider, record] of Object.entries(stored)) {
@@ -66,8 +66,8 @@ function readAll(): ConnectionDocument {
   return document
 }
 
-export function readConnection(provider: ProviderId): ConnectionRecord | null {
-  return readAll()[provider] ?? null
+export async function readConnection(provider: ProviderId): Promise<ConnectionRecord | null> {
+  return (await readAll())[provider] ?? null
 }
 
 /**
@@ -76,8 +76,8 @@ export function readConnection(provider: ProviderId): ConnectionRecord | null {
  * returns only a new access token on a refresh, and dropping the old refresh
  * token there would end the connection one hour later.
  */
-export function saveConnection(provider: ProviderId, tokens: ProviderTokens): ConnectionRecord {
-  const document = readAll()
+export async function saveConnection(provider: ProviderId, tokens: ProviderTokens): Promise<ConnectionRecord> {
+  const document = await readAll()
   const existing = document[provider] ?? null
   const record: ConnectionRecord = {
     tokens: {
@@ -89,35 +89,35 @@ export function saveConnection(provider: ProviderId, tokens: ProviderTokens): Co
     lastSyncAt: existing?.lastSyncAt ?? null,
   }
   document[provider] = record
-  writeDocument(DOCUMENT, document)
+  await writeDocument(DOCUMENT, document)
   return record
 }
 
-export function clearConnection(provider: ProviderId): void {
-  const document = readAll()
+export async function clearConnection(provider: ProviderId): Promise<void> {
+  const document = await readAll()
   if (document[provider] === undefined) return
   delete document[provider]
-  writeDocument(DOCUMENT, document)
+  await writeDocument(DOCUMENT, document)
 }
 
-export function isConnected(provider: ProviderId): boolean {
-  return readConnection(provider) !== null
+export async function isConnected(provider: ProviderId): Promise<boolean> {
+  return (await readConnection(provider)) !== null
 }
 
-export function markSynced(provider: ProviderId, at: string): void {
-  const document = readAll()
+export async function markSynced(provider: ProviderId, at: string): Promise<void> {
+  const document = await readAll()
   const record = document[provider]
   if (record === undefined) return
   document[provider] = { ...record, lastSyncAt: at }
-  writeDocument(DOCUMENT, document)
+  await writeDocument(DOCUMENT, document)
 }
 
 /** Feeds `describeAllDataSources` in the Einstellungen view. */
-export function connectionStates(): Partial<
+export async function connectionStates(): Promise<Partial<
   Record<ProviderId, { connected: boolean; lastSyncAt: string | null }>
-> {
+>> {
   const states: Partial<Record<ProviderId, { connected: boolean; lastSyncAt: string | null }>> = {}
-  for (const [provider, record] of Object.entries(readAll())) {
+  for (const [provider, record] of Object.entries(await readAll())) {
     if (record === undefined) continue
     states[provider as ProviderId] = { connected: true, lastSyncAt: record.lastSyncAt }
   }
@@ -130,7 +130,7 @@ export function connectionStates(): Partial<
  * `ProviderAuthError` when a stored connection can no longer be renewed.
  */
 export async function getUsableTokens(provider: ProviderId): Promise<ProviderTokens | null> {
-  const record = readConnection(provider)
+  const record = await readConnection(provider)
   if (record === null) return null
 
   if (record.tokens.expiresAt - Date.now() > REFRESH_MARGIN_MS) return record.tokens
@@ -161,5 +161,5 @@ export async function getUsableTokens(provider: ProviderId): Promise<ProviderTok
       `Die Verbindung ließ sich nicht erneuern: ${detail}`,
     )
   }
-  return saveConnection(provider, refreshed).tokens
+  return (await saveConnection(provider, refreshed)).tokens
 }

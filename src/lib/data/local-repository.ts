@@ -32,44 +32,44 @@ function activityDayKey(activity: Activity): string {
  */
 export class LocalRepository implements HealthDataRepository {
   async getSettings(): Promise<UserSettings> {
-    return readSettings()
+    return await readSettings()
   }
 
   async saveSettings(settings: UserSettings): Promise<UserSettings> {
-    return writeSettings(settings)
+    return await writeSettings(settings)
   }
 
   async getActivities(range: DateRange): Promise<Activity[]> {
-    return readActivities().filter((activity) => rangeContains(range, activityDayKey(activity)))
+    return (await readActivities()).filter((activity) => rangeContains(range, activityDayKey(activity)))
   }
 
   async getActivityById(id: string): Promise<ActivityDetail | null> {
-    const activity = readActivities().find((candidate) => candidate.id === id)
+    const activity = (await readActivities()).find((candidate) => candidate.id === id)
     return activity === undefined ? null : { activity, streams: null }
   }
 
   async getDailyHealth(range: DateRange): Promise<DailyHealthMetrics[]> {
-    return readDailyHealth().filter((entry) => rangeContains(range, entry.date))
+    return (await readDailyHealth()).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getSleepSessions(range: DateRange): Promise<SleepSession[]> {
-    return readSleep().filter((entry) => rangeContains(range, entry.date))
+    return (await readSleep()).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getRecoveryMetrics(range: DateRange): Promise<RecoveryMetric[]> {
-    return readRecovery().filter((entry) => rangeContains(range, entry.date))
+    return (await readRecovery()).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getDataSources(): Promise<DataSourceStatus[]> {
-    return describeAllDataSources(connectionStates())
+    return describeAllDataSources(await connectionStates())
   }
 
   async getEarliestRecordDate(): Promise<string | null> {
     const candidates = [
-      ...readActivities().map(activityDayKey),
-      ...readDailyHealth().map((entry) => entry.date),
-      ...readSleep().map((entry) => entry.date),
-      ...readRecovery().map((entry) => entry.date),
+      ...(await readActivities()).map(activityDayKey),
+      ...(await readDailyHealth()).map((entry) => entry.date),
+      ...(await readSleep()).map((entry) => entry.date),
+      ...(await readRecovery()).map((entry) => entry.date),
     ]
     return candidates.length === 0
       ? null

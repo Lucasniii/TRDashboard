@@ -19,8 +19,8 @@ export function getRepository(): HealthDataRepository {
 }
 
 /** Allows the landing page to distinguish a first run from an empty chart. */
-export function isEmptyState(): boolean {
-  return !IS_MOCK_DATA && !hasAnyRecords()
+export async function isEmptyState(): Promise<boolean> {
+  return !IS_MOCK_DATA && !(await hasAnyRecords())
 }
 
 export type { HealthDataRepository } from './repository'

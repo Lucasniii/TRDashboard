@@ -62,7 +62,7 @@ export async function GET(
   if (requestUrl.searchParams.get('error') !== null) return failure('abgebrochen')
 
   const state = requestUrl.searchParams.get('state')
-  if (!consumeState(provider, state)) return failure('sicherheitspruefung')
+  if (!(await consumeState(provider, state))) return failure('sicherheitspruefung')
 
   const code = requestUrl.searchParams.get('code')
   if (code === null || code === '') return failure('abgebrochen')
@@ -75,7 +75,7 @@ export async function GET(
   try {
     // The redirect URI has to be byte-identical to the one sent in step one.
     const tokens = await adapter.exchangeCode(code, `${base}/api/auth/${provider}/callback`)
-    saveConnection(provider, tokens)
+    await saveConnection(provider, tokens)
   } catch (error) {
     // The provider's own words, minus anything we sent it. A rejected client id
     // or secret is by far the most common cause and deserves its own message,
