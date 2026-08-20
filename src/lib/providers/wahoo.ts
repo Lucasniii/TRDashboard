@@ -26,7 +26,7 @@ const WAHOO_AUTH_URL = 'https://api.wahooligan.com/oauth/authorize'
 const WAHOO_TOKEN_URL = 'https://api.wahooligan.com/oauth/token'
 const WAHOO_API_BASE = 'https://api.wahooligan.com'
 
-const WAHOO_SCOPES = ['user_read', 'workouts_read', 'offline_data'].join(' ')
+const WAHOO_SCOPES = ['user_read', 'email', 'workouts_read', 'offline_data'].join(' ')
 
 const PAGE_SIZE = 30
 /** Bounds a first sync; 20 pages cover well over a year of riding. */
@@ -49,6 +49,12 @@ interface WahooTokenResponse {
 interface WahooCredentials {
   clientId: string
   clientSecret: string
+}
+
+export interface WahooIdentity {
+  id: string
+  displayName: string | null
+  email: string | null
 }
 
 function readCredentials(): WahooCredentials {
@@ -174,6 +180,22 @@ export class WahooAdapter implements ProviderAdapter {
       refresh_token: tokens.refreshToken,
     })
     return toTokens(response, tokens)
+  }
+
+  /** Identifies the Wahoo member whose OAuth grant created this session. */
+  async getIdentity(tokens: ProviderTokens): Promise<WahooIdentity> {
+    const body = await getJson<Record<string, unknown>>(tokens.accessToken, '/v1/user')
+    const rawId = body.id
+    if ((typeof rawId !== 'string' && typeof rawId !== 'number') || String(rawId).trim() === '') {
+      throw new Error('Wahoo hat keine Nutzerkennung zurückgegeben.')
+    }
+    const first = typeof body.first === 'string' ? body.first.trim() : ''
+    const last = typeof body.last === 'string' ? body.last.trim() : ''
+    return {
+      id: String(rawId),
+      displayName: [first, last].filter(Boolean).join(' ') || null,
+      email: typeof body.email === 'string' && body.email.trim() !== '' ? body.email.trim() : null,
+    }
   }
 
   async fetch(tokens: ProviderTokens, range: DateRange, userId?: string): Promise<ProviderFetchResult> {

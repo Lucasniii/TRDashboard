@@ -15,8 +15,9 @@ import { isUserConnected } from '@/lib/store/user-tokens'
 
 /**
  * The sign-in screen. There is no TRDashboard account: signing in means authorising
- * WHOOP is the dashboard identity. Wahoo can be linked afterwards from the
- * settings page to that same dashboard account.
+ * WHOOP and Wahoo both create dashboard identities via their normal OAuth
+ * logins. A user who is already signed in can additionally link the other
+ * provider from Einstellungen.
  */
 
 export const dynamic = 'force-dynamic'
@@ -73,7 +74,6 @@ export default async function SignInPage({
       ...option,
       configured: isProviderConfigured(option.provider),
       connected: user === null ? false : await isUserConnected(user.id, option.provider),
-      canAuthorize: option.provider === 'whoop' || user !== null,
     })),
   )
 
@@ -132,24 +132,19 @@ export default async function SignInPage({
 
               {row.connected ? (
                 <span className="shrink-0 text-sm text-ink-muted">Bereits angemeldet</span>
-              ) : row.configured && row.canAuthorize ? (
+              ) : row.configured ? (
                 /* A full navigation on purpose — the provider answers with a redirect. */
                 <a href={`/api/auth/${row.provider}`} className={cn(PRIMARY, 'shrink-0')}>
                   Mit {row.label} anmelden
                 </a>
               ) : (
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <button
-                    type="button"
-                    disabled
-                    className={cn(PRIMARY, 'cursor-not-allowed opacity-50')}
-                  >
-                    Mit {row.label} anmelden
-                  </button>
-                  {row.provider === 'wahoo' && user === null ? (
-                    <p className="text-xs text-ink-muted">Zuerst mit WHOOP anmelden</p>
-                  ) : null}
-                </div>
+                <button
+                  type="button"
+                  disabled
+                  className={cn(PRIMARY, 'shrink-0 cursor-not-allowed opacity-50')}
+                >
+                  Mit {row.label} anmelden
+                </button>
               )}
             </li>
           ))}

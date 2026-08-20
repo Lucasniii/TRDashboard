@@ -18,16 +18,28 @@ interface SessionRow {
 
 interface UserRow {
   id: string
-  whoop_user_id: string
+  whoop_user_id: string | null
+  wahoo_user_id: string | null
   display_name: string | null
   email: string | null
 }
 
 export interface CurrentUser {
   id: string
-  whoopUserId: string
+  whoopUserId: string | null
+  wahooUserId: string | null
   displayName: string | null
   email: string | null
+}
+
+function currentUser(row: UserRow): CurrentUser {
+  return {
+    id: row.id,
+    whoopUserId: row.whoop_user_id,
+    wahooUserId: row.wahoo_user_id,
+    displayName: row.display_name,
+    email: row.email,
+  }
 }
 
 function config(): Config {
@@ -78,7 +90,51 @@ export async function upsertWhoopUser(identity: {
   })
   const row = rows[0]
   if (row === undefined) throw new Error('Das WHOOP-Konto konnte nicht angelegt werden.')
-  return { id: row.id, whoopUserId: row.whoop_user_id, displayName: row.display_name, email: row.email }
+  return currentUser(row)
+}
+
+export async function upsertWahooUser(identity: {
+  wahooUserId: string
+  displayName: string | null
+  email: string | null
+}): Promise<CurrentUser> {
+  const rows = await request<UserRow[]>('/rest/v1/trdashboard_users?on_conflict=wahoo_user_id', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=representation',
+    },
+    body: JSON.stringify({
+      wahoo_user_id: identity.wahooUserId,
+      display_name: identity.displayName,
+      email: identity.email,
+      updated_at: new Date().toISOString(),
+    }),
+  })
+  const row = rows[0]
+  if (row === undefined) throw new Error('Das Wahoo-Konto konnte nicht angelegt werden.')
+  return currentUser(row)
+}
+
+/** Links a Wahoo login to the WHOOP account currently open in this browser. */
+export async function linkWahooUser(
+  userId: string,
+  identity: { wahooUserId: string; displayName: string | null; email: string | null },
+): Promise<CurrentUser> {
+  const rows = await request<UserRow[]>(
+    `/rest/v1/trdashboard_users?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({
+        wahoo_user_id: identity.wahooUserId,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  )
+  const row = rows[0]
+  if (row === undefined) throw new Error('Das Wahoo-Konto konnte nicht verknüpft werden.')
+  return currentUser(row)
 }
 
 export async function createSession(userId: string): Promise<string> {
@@ -133,10 +189,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = sessions[0]
   if (session === undefined || new Date(session.expires_at).getTime() <= Date.now()) return null
   const users = await request<UserRow[]>(
-    `/rest/v1/trdashboard_users?id=eq.${encodeURIComponent(session.user_id)}&select=id,whoop_user_id,display_name,email&limit=1`,
+    `/rest/v1/trdashboard_users?id=eq.${encodeURIComponent(session.user_id)}&select=id,whoop_user_id,wahoo_user_id,display_name,email&limit=1`,
   )
   const user = users[0]
-  return user === undefined
-    ? null
-    : { id: user.id, whoopUserId: user.whoop_user_id, displayName: user.display_name, email: user.email }
+  return user === undefined ? null : currentUser(user)
 }
