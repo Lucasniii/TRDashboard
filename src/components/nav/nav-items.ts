@@ -98,11 +98,32 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/einstellungen', label: 'Einstellungen', Icon: SettingsIcon },
 ]
 
-/** The bottom tab bar shows the first five; the rest live behind "Mehr". */
-export const PRIMARY_NAV_COUNT = 5
+/**
+ * The bottom tab bar is a separate selection, not the first N of the sidebar:
+ * the sidebar follows the sections in their documented order, while the tab bar
+ * carries the five screens worth a daily glance. Kalender earns a slot over
+ * Trends, which is long-term analysis rather than something checked today.
+ *
+ * Five plus "Mehr" is the ceiling — six columns is what fits a 375px screen
+ * without the labels truncating.
+ */
+const PRIMARY_NAV_HREFS: readonly string[] = [
+  '/',
+  '/aktivitaeten',
+  '/training',
+  '/gesundheit',
+  '/kalender',
+]
 
-export const PRIMARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.slice(0, PRIMARY_NAV_COUNT)
-export const SECONDARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.slice(PRIMARY_NAV_COUNT)
+export const PRIMARY_NAV_ITEMS: readonly NavItem[] = PRIMARY_NAV_HREFS.map((href) => {
+  const item = NAV_ITEMS.find((candidate) => candidate.href === href)
+  if (item === undefined) throw new Error(`Unbekannte Route in der Schnellansicht: ${href}`)
+  return item
+})
+
+export const SECONDARY_NAV_ITEMS: readonly NavItem[] = NAV_ITEMS.filter(
+  (item) => !PRIMARY_NAV_HREFS.includes(item.href),
+)
 
 /** '/' is only ever active on an exact match; deeper routes also match their children. */
 export function isNavItemActive(pathname: string, href: string): boolean {
