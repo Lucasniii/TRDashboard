@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import type { ReactElement } from 'react'
 
 import { Sparkline } from '@/components/charts/sparkline'
@@ -31,7 +30,7 @@ import {
   type SeriesPoint,
 } from '@/lib/analytics'
 import { IS_MOCK_DATA, getRepository, isEmptyState } from '@/lib/data'
-import { isConnected } from '@/lib/store/tokens'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { addDays, fromDayKey, lastWeekRanges, previousRange, toDayKey, weekRange } from '@/lib/date'
 import type { Activity, DateRange } from '@/lib/domain/types'
 import {
@@ -105,13 +104,11 @@ export default async function OverviewPage({
   searchParams: Promise<OverviewSearchParams>
 }): Promise<ReactElement> {
   const params = await searchParams
+  const userId = await requireDashboardUserId()
 
-  if (await isEmptyState()) {
-    // Not signed in at all: the dashboard has nothing to say yet, so send the
-    // user to the one action that changes that.
-    if (!(await isConnected('whoop')) && !(await isConnected('wahoo'))) redirect('/anmelden')
-
-    // Connected, but the store is empty — the first sync did not deliver.
+  if (await isEmptyState(userId)) {
+    // Connected, but their private data store is empty — the first sync did
+    // not deliver. A wall of zeroes would imply no training instead.
     // A wall of zeroes would read as "you trained nothing", which is a
     // different statement from "there is no data".
     return (
@@ -137,7 +134,7 @@ export default async function OverviewPage({
     )
   }
 
-  const repository = getRepository()
+  const repository = getRepository(userId)
   const today = new Date()
   const todayKey = toDayKey(today)
 

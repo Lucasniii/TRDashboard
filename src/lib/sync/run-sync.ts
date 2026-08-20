@@ -15,11 +15,9 @@ import {
   upsertSleep,
 } from '@/lib/store/records'
 import {
-  ProviderAuthError,
-  connectionStates,
-  getUsableTokens,
-  markSynced,
-} from '@/lib/store/tokens'
+  getUserTokens,
+  markUserSynced,
+} from '@/lib/store/user-tokens'
 
 /**
  * One sync run: fetch a date window from a provider, upsert what came back and
@@ -34,8 +32,8 @@ import {
  *   - `succeeded` — rows were written (a window with no new data is a success
  *                   with zero counts, not a failure).
  *
- * Runs are sequential on purpose. The file store has no locking, so two
- * providers writing `activities.json` at the same time would lose rows.
+ * Runs are sequential per request so provider calls stay predictable and a
+ * user's document updates are not needlessly interleaved.
  */
 
 /** Deep enough for a base period, small enough to stay inside provider rate limits. */
@@ -84,7 +82,6 @@ export function defaultRange(days: number = DEFAULT_WINDOW_DAYS, today: Date = n
  */
 function describeFailure(provider: ProviderId, error: unknown): string {
   const label = getProviderLabel(provider)
-  if (error instanceof ProviderAuthError) return error.message
   const detail = error instanceof Error ? error.message : String(error)
   if (/\(401\)/.test(detail) || /\b401\b/.test(detail)) {
     return `Die Verbindung zu ${label} wurde vom Anbieter abgelehnt. Bitte ${label} neu verbinden.`
@@ -93,23 +90,24 @@ function describeFailure(provider: ProviderId, error: unknown): string {
   return `Die Synchronisierung mit ${label} ist fehlgeschlagen: ${detail}`
 }
 
-async function writeResult(result: ProviderFetchResult): Promise<SyncOutcome['counts']> {
+async function writeResult(userId: string, result: ProviderFetchResult): Promise<SyncOutcome['counts']> {
   return {
-    activities: await upsertActivities(result.activities),
-    dailyHealth: await upsertDailyHealth(result.dailyHealth),
-    sleep: await upsertSleep(result.sleep),
-    recovery: await upsertRecovery(result.recovery),
+    activities: await upsertActivities(userId, result.activities),
+    dailyHealth: await upsertDailyHealth(userId, result.dailyHealth),
+    sleep: await upsertSleep(userId, result.sleep),
+    recovery: await upsertRecovery(userId, result.recovery),
   }
 }
 
 async function recordJob(
+  userId: string,
   provider: ProviderId,
   startedAt: string,
   status: SyncJob['status'],
   counts: SyncOutcome['counts'],
   error: string | null,
 ): Promise<void> {
-  await appendSyncJob({
+  await appendSyncJob(userId, {
     id: randomUUID(),
     provider,
     status,
@@ -129,7 +127,7 @@ function skipped(provider: ProviderId, reason: string | null): SyncOutcome {
   return { provider, status: 'skipped', counts: emptyCounts(), error: reason }
 }
 
-export async function syncProvider(provider: ProviderId, days?: number): Promise<SyncOutcome> {
+export async function syncProvider(userId: string, provider: ProviderId, days?: number): Promise<SyncOutcome> {
   const adapter = getAdapter(provider)
   if (adapter === null) {
     return skipped(provider, `Für ${getProviderLabel(provider)} gibt es noch keine Anbindung.`)
@@ -139,12 +137,12 @@ export async function syncProvider(provider: ProviderId, days?: number): Promise
 
   let tokens: ProviderTokens | null
   try {
-    tokens = await getUsableTokens(provider)
+    tokens = await getUserTokens(userId, provider)
   } catch (error) {
     // Connected, but the token could not be renewed — a real failure, and the
     // stored connection stays in place so the user can retry or reconnect.
     const message = describeFailure(provider, error)
-    await recordJob(provider, startedAt, 'failed', emptyCounts(), message)
+    await recordJob(userId, provider, startedAt, 'failed', emptyCounts(), message)
     return { provider, status: 'failed', counts: emptyCounts(), error: message }
   }
 
@@ -155,31 +153,29 @@ export async function syncProvider(provider: ProviderId, days?: number): Promise
   const range = defaultRange(days ?? DEFAULT_WINDOW_DAYS)
 
   try {
-    const result = await adapter.fetch(tokens, range)
-    const counts = await writeResult(result)
+    const result = await adapter.fetch(tokens, range, userId)
+    const counts = await writeResult(userId, result)
     const finishedAt = new Date().toISOString()
-    await markSynced(provider, finishedAt)
-    await recordJob(provider, startedAt, 'succeeded', counts, null)
+    await markUserSynced(userId, provider, finishedAt)
+    await recordJob(userId, provider, startedAt, 'succeeded', counts, null)
     return { provider, status: 'succeeded', counts, error: null }
   } catch (error) {
     const message = describeFailure(provider, error)
     // No markSynced: a failed run must not look like fresh data.
-    await recordJob(provider, startedAt, 'failed', emptyCounts(), message)
+    await recordJob(userId, provider, startedAt, 'failed', emptyCounts(), message)
     return { provider, status: 'failed', counts: emptyCounts(), error: message }
   }
 }
 
 /** Every connected provider, in display order, one after the other. */
-export async function syncAllConnected(days?: number): Promise<SyncOutcome[]> {
-  const states = await connectionStates()
-  const providers = PROVIDER_ORDER.filter(
-    (id) => getAdapter(id) !== null && states[id]?.connected === true,
-  )
+export async function syncAllConnected(userId: string, days?: number): Promise<SyncOutcome[]> {
+  const providers = PROVIDER_ORDER.filter((id) => getAdapter(id) !== null)
 
   const outcomes: SyncOutcome[] = []
   for (const provider of providers) {
     // syncProvider never throws, so one broken provider cannot stop the next.
-    outcomes.push(await syncProvider(provider, days))
+    const outcome = await syncProvider(userId, provider, days)
+    if (outcome.status !== 'skipped') outcomes.push(outcome)
   }
   return outcomes
 }

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/section'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { aggregateZones } from '@/lib/analytics/zones'
 import { getRepository } from '@/lib/data'
 import { formatDateLong, formatDuration, formatNumber, formatTime } from '@/lib/format'
@@ -31,7 +32,10 @@ interface ActivityDetailPageProps {
 
 export async function generateMetadata({ params }: ActivityDetailPageProps): Promise<Metadata> {
   const { id } = await params
-  const detail = await getRepository().getActivityById(id)
+  // Metadata must not disclose a private activity title to an unauthenticated
+  // request. The page itself redirects before loading it.
+  const userId = await requireDashboardUserId()
+  const detail = await getRepository(userId).getActivityById(id)
   return {
     title: detail === null ? 'Aktivität nicht gefunden · TRDashboard' : `${detail.activity.name} · TRDashboard`,
   }
@@ -41,7 +45,7 @@ export default async function ActivityDetailPage({
   params,
 }: ActivityDetailPageProps): Promise<ReactElement> {
   const { id } = await params
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
 
   const [detail, settings, sources] = await Promise.all([
     repository.getActivityById(id),

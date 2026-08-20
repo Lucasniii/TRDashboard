@@ -39,5 +39,6 @@ export interface ProviderAdapter {
   exchangeCode(code: string, redirectUri: string): Promise<ProviderTokens>
   refresh(tokens: ProviderTokens): Promise<ProviderTokens>
 
-  fetch(tokens: ProviderTokens, range: DateRange): Promise<ProviderFetchResult>
+  /** `userId` is written into normalized records; storage enforces the same boundary. */
+  fetch(tokens: ProviderTokens, range: DateRange, userId?: string): Promise<ProviderFetchResult>
 }

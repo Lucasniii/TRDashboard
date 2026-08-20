@@ -7,6 +7,7 @@ import { MONTH_PARAM, resolveMonthKey } from '@/components/calendar/calendar-mod
 import { DayHealthCard } from '@/components/calendar/day-health-card'
 import { DayTrainingCard } from '@/components/calendar/day-training-card'
 import { PageHeader } from '@/components/ui/section'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { addDays, fromDayKey, toDayKey } from '@/lib/date'
 import { getRepository } from '@/lib/data'
 import type { DateRange } from '@/lib/domain/types'
@@ -44,7 +45,7 @@ export default async function KalenderTagPage({
   if (!isDayKey(tag)) notFound()
 
   const range = dayRange(tag)
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const [activities, daily, sleep, recovery] = await Promise.all([
     repository.getActivities(range),
     repository.getDailyHealth(range),

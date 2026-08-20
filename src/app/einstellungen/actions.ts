@@ -11,10 +11,11 @@ import {
   buildPowerZones,
 } from '@/components/settings/zone-math'
 import { getRepository } from '@/lib/data'
+import { getCurrentUser } from '@/lib/auth/session'
 import type { ProviderId, UserSettings, WeeklyGoals } from '@/lib/domain/types'
 import { getAdapter, getProviderLabel } from '@/lib/providers/registry'
 import { deleteByProvider } from '@/lib/store/records'
-import { clearConnection, connectionStates, isConnected } from '@/lib/store/tokens'
+import { clearUserConnection, isUserConnected } from '@/lib/store/user-tokens'
 import { syncAllConnected, syncProvider, type SyncOutcome } from '@/lib/sync/run-sync'
 
 /**
@@ -191,7 +192,12 @@ export async function saveSettingsAction(
     return { ok: false, message: 'Bitte die markierten Felder prüfen.', errors }
   }
 
-  const repository = getRepository()
+  const user = await getCurrentUser()
+  if (user === null) {
+    return { ok: false, message: 'Bitte zuerst mit WHOOP anmelden.', errors: {} }
+  }
+
+  const repository = getRepository(user.id)
   const current = await repository.getSettings()
 
   const next: UserSettings = {
@@ -269,29 +275,25 @@ function revalidateAfterStoreWrite(): void {
  * sync and got one; only an impossible request is `ok: false`.
  */
 export async function runSyncAction(provider?: ProviderId): Promise<SyncActionResult> {
+  const user = await getCurrentUser()
+  if (user === null) return { ok: false, message: 'Bitte zuerst mit WHOOP anmelden.' }
   let outcomes: SyncOutcome[]
 
   if (provider === undefined) {
-    const states = await connectionStates()
-    if (!Object.values(states).some((state) => state?.connected === true)) {
-      return {
-        ok: false,
-        message: 'Es ist keine Datenquelle verbunden. Bitte zuerst WHOOP oder Wahoo verbinden.',
-      }
-    }
-    outcomes = await syncAllConnected()
+    outcomes = await syncAllConnected(user.id)
+    if (outcomes.length === 0) return { ok: false, message: 'Es ist keine Datenquelle verbunden. Bitte zuerst WHOOP oder Wahoo verbinden.' }
   } else {
     const target = parseProvider(provider)
     if (target === null) {
       return { ok: false, message: 'Diese Datenquelle lässt sich nicht synchronisieren.' }
     }
-    if (!(await isConnected(target))) {
+    if (!(await isUserConnected(user.id, target))) {
       return {
         ok: false,
         message: `${getProviderLabel(target)} ist nicht verbunden. Bitte zuerst verbinden.`,
       }
     }
-    outcomes = [await syncProvider(target)]
+    outcomes = [await syncProvider(user.id, target)]
   }
 
   revalidateAfterStoreWrite()
@@ -304,14 +306,16 @@ export async function runSyncAction(provider?: ProviderId): Promise<SyncActionRe
  * Keeping the rows would keep showing data the user believes they revoked.
  */
 export async function disconnectAction(provider: ProviderId): Promise<DisconnectActionResult> {
+  const user = await getCurrentUser()
+  if (user === null) return { ok: false, message: 'Bitte zuerst mit WHOOP anmelden.' }
   const target = parseProvider(provider)
   if (target === null) {
     return { ok: false, message: 'Diese Datenquelle lässt sich nicht trennen.' }
   }
 
   const label = getProviderLabel(target)
-  await clearConnection(target)
-  const removed = await deleteByProvider(target)
+  await clearUserConnection(user.id, target)
+  const removed = await deleteByProvider(user.id, target)
 
   revalidateAfterStoreWrite()
 

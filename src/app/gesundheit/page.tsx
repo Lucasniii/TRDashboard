@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { PageHeader, SectionHeading } from '@/components/ui/section'
 import { StatTile } from '@/components/ui/stat-tile'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import {
   deriveReadiness,
   metricSeries,
@@ -253,7 +254,7 @@ export default async function GesundheitPage({
     to: toDayKey(addDays(today, 1)),
   }
 
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const [daily, sleep, recovery, recentActivities] = await Promise.all([
     repository.getDailyHealth(historyRange),
     repository.getSleepSessions(historyRange),

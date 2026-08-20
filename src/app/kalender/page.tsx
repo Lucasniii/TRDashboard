@@ -16,6 +16,7 @@ import { MonthNavigation } from '@/components/calendar/month-navigation'
 import { PageHeader } from '@/components/ui/section'
 import { EMPTY_NO_ACTIVITIES } from '@/components/ui/empty-state'
 import { summarizeWeek } from '@/lib/analytics/weekly'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { getRepository } from '@/lib/data'
 import type { ActivityType } from '@/lib/domain/types'
 import { formatDistance, formatDuration, formatElevation } from '@/lib/format'
@@ -49,7 +50,7 @@ export default async function KalenderPage({
   const monthKey = resolveMonthKey(params[MONTH_PARAM], today)
 
   const gridRange = calendarGridRange(monthKey)
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const [activities, recovery] = await Promise.all([
     repository.getActivities(gridRange),
     repository.getRecoveryMetrics(gridRange),

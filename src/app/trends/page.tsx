@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import { buildTrendDataset } from '@/components/trends/trend-dataset'
 import { TrendsExplorer } from '@/components/trends/trends-explorer'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { getRepository } from '@/lib/data'
 import { periodToRange, toDayKey } from '@/lib/date'
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
  * there — no round trip, and no second reading of the same records.
  */
 export default async function TrendsPage(): Promise<ReactElement> {
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const today = new Date()
 
   const earliest = await repository.getEarliestRecordDate()

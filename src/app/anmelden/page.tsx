@@ -6,16 +6,17 @@ import { ConnectionBanner } from '@/components/settings/connection-banner'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/section'
+import { getCurrentUser } from '@/lib/auth/session'
 import { cn } from '@/lib/cn'
 import { IS_MOCK_DATA } from '@/lib/data'
 import type { ProviderId } from '@/lib/domain/types'
 import { isProviderConfigured } from '@/lib/providers/registry'
-import { isConnected } from '@/lib/store/tokens'
+import { isUserConnected } from '@/lib/store/user-tokens'
 
 /**
  * The sign-in screen. There is no TRDashboard account: signing in means authorising
- * WHOOP or Wahoo, and the provider account is the identity. The first sync runs
- * inside the callback, so this is the only step the user performs.
+ * WHOOP is the dashboard identity. Wahoo can be linked afterwards from the
+ * settings page to that same dashboard account.
  */
 
 export const dynamic = 'force-dynamic'
@@ -65,12 +66,14 @@ export default async function SignInPage({
   searchParams: Promise<SignInSearchParams>
 }): Promise<ReactElement> {
   const params = await searchParams
+  const user = IS_MOCK_DATA ? null : await getCurrentUser()
 
   const rows = await Promise.all(
     OPTIONS.map(async (option) => ({
       ...option,
       configured: isProviderConfigured(option.provider),
-      connected: await isConnected(option.provider),
+      connected: user === null ? false : await isUserConnected(user.id, option.provider),
+      canAuthorize: option.provider === 'whoop' || user !== null,
     })),
   )
 
@@ -129,19 +132,24 @@ export default async function SignInPage({
 
               {row.connected ? (
                 <span className="shrink-0 text-sm text-ink-muted">Bereits angemeldet</span>
-              ) : row.configured ? (
+              ) : row.configured && row.canAuthorize ? (
                 /* A full navigation on purpose — the provider answers with a redirect. */
                 <a href={`/api/auth/${row.provider}`} className={cn(PRIMARY, 'shrink-0')}>
                   Mit {row.label} anmelden
                 </a>
               ) : (
-                <button
-                  type="button"
-                  disabled
-                  className={cn(PRIMARY, 'shrink-0 cursor-not-allowed opacity-50')}
-                >
-                  Mit {row.label} anmelden
-                </button>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <button
+                    type="button"
+                    disabled
+                    className={cn(PRIMARY, 'cursor-not-allowed opacity-50')}
+                  >
+                    Mit {row.label} anmelden
+                  </button>
+                  {row.provider === 'wahoo' && user === null ? (
+                    <p className="text-xs text-ink-muted">Zuerst mit WHOOP anmelden</p>
+                  ) : null}
+                </div>
               )}
             </li>
           ))}
@@ -150,8 +158,8 @@ export default async function SignInPage({
 
       {anyConfigured ? (
         <p className="text-sm text-ink-muted">
-          Nach der Freigabe holt TRDashboard einmalig die Daten der letzten 120 Tage. Das dauert einen
-          Moment — danach landest du direkt auf der Übersicht.
+          Nach der Freigabe kannst du in den Einstellungen deinen ersten Abgleich starten. Dabei
+          bleiben die Daten jedes WHOOP-Kontos strikt getrennt.
         </p>
       ) : null}
 

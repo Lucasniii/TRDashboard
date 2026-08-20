@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import { ActivityList } from '@/components/activities/activity-list'
 import { PageHeader } from '@/components/ui/section'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { getRepository } from '@/lib/data'
 import { addDays, toDayKey } from '@/lib/date'
 
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ActivitiesPage(): Promise<ReactElement> {
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const today = new Date()
   const todayKey = toDayKey(today)
 

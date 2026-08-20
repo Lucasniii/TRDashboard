@@ -1,9 +1,10 @@
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 
+import { getCurrentUser } from '@/lib/auth/session'
 import type { ProviderId } from '@/lib/domain/types'
 import { getAdapter, getProviderLabel } from '@/lib/providers/registry'
-import { connectionStates, isConnected } from '@/lib/store/tokens'
+import { isUserConnected } from '@/lib/store/user-tokens'
 import { syncAllConnected, syncProvider, type SyncOutcome } from '@/lib/sync/run-sync'
 
 /**
@@ -58,6 +59,8 @@ async function readBody(request: Request): Promise<SyncRequestBody | 'invalid'> 
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const user = await getCurrentUser()
+  if (user === null) return NextResponse.json({ error: 'Bitte zuerst mit WHOOP anmelden.' }, { status: 401 })
   const body = await readBody(request)
   if (body === 'invalid') {
     return NextResponse.json(
@@ -69,7 +72,7 @@ export async function POST(request: Request): Promise<Response> {
   let outcomes: SyncOutcome[]
 
   if (body.provider !== undefined) {
-    if (!(await isConnected(body.provider))) {
+    if (!(await isUserConnected(user.id, body.provider))) {
       return NextResponse.json(
         {
           error: `${getProviderLabel(body.provider)} ist nicht verbunden. Bitte zuerst verbinden.`,
@@ -77,17 +80,15 @@ export async function POST(request: Request): Promise<Response> {
         { status: 400 },
       )
     }
-    outcomes = [await syncProvider(body.provider, body.days)]
+    outcomes = [await syncProvider(user.id, body.provider, body.days)]
   } else {
-    const states = await connectionStates()
-    const anyConnected = Object.values(states).some((state) => state?.connected === true)
-    if (!anyConnected) {
+    outcomes = await syncAllConnected(user.id, body.days)
+    if (outcomes.length === 0) {
       return NextResponse.json(
         { error: 'Es ist keine Datenquelle verbunden. Bitte zuerst WHOOP oder Wahoo verbinden.' },
         { status: 400 },
       )
     }
-    outcomes = await syncAllConnected(body.days)
   }
 
   if (outcomes.some((outcome) => outcome.status === 'succeeded')) {

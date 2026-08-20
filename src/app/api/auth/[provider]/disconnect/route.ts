@@ -1,10 +1,11 @@
 import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 
+import { getCurrentUser } from '@/lib/auth/session'
 import type { ProviderId } from '@/lib/domain/types'
 import { getAdapter } from '@/lib/providers/registry'
 import { deleteByProvider } from '@/lib/store/records'
-import { clearConnection } from '@/lib/store/tokens'
+import { clearUserConnection } from '@/lib/store/user-tokens'
 
 /**
  * Disconnecting drops the tokens and every record the provider ever delivered.
@@ -30,8 +31,10 @@ export async function POST(
     return NextResponse.json({ error: 'Unbekannte Datenquelle.' }, { status: 404 })
   }
 
-  await clearConnection(provider)
-  const removed = await deleteByProvider(provider)
+  const user = await getCurrentUser()
+  if (user === null) return NextResponse.json({ error: 'Nicht angemeldet.' }, { status: 401 })
+  await clearUserConnection(user.id, provider)
+  const removed = await deleteByProvider(user.id, provider)
 
   // Every page reads these records, so the whole tree has to refetch.
   revalidatePath('/', 'layout')

@@ -19,7 +19,7 @@ import {
   readSleep,
   writeSettings,
 } from '@/lib/store/records'
-import { connectionStates } from '@/lib/store/tokens'
+import { userConnectionStates } from '@/lib/store/user-tokens'
 
 /** The local calendar day of an activity is encoded in its ISO start time. */
 function activityDayKey(activity: Activity): string {
@@ -31,45 +31,47 @@ function activityDayKey(activity: Activity): string {
  * and permissions; this layer only turns its collections into page queries.
  */
 export class LocalRepository implements HealthDataRepository {
+  constructor(private readonly userId: string) {}
+
   async getSettings(): Promise<UserSettings> {
-    return await readSettings()
+    return await readSettings(this.userId)
   }
 
   async saveSettings(settings: UserSettings): Promise<UserSettings> {
-    return await writeSettings(settings)
+    return await writeSettings(this.userId, settings)
   }
 
   async getActivities(range: DateRange): Promise<Activity[]> {
-    return (await readActivities()).filter((activity) => rangeContains(range, activityDayKey(activity)))
+    return (await readActivities(this.userId)).filter((activity) => rangeContains(range, activityDayKey(activity)))
   }
 
   async getActivityById(id: string): Promise<ActivityDetail | null> {
-    const activity = (await readActivities()).find((candidate) => candidate.id === id)
+    const activity = (await readActivities(this.userId)).find((candidate) => candidate.id === id)
     return activity === undefined ? null : { activity, streams: null }
   }
 
   async getDailyHealth(range: DateRange): Promise<DailyHealthMetrics[]> {
-    return (await readDailyHealth()).filter((entry) => rangeContains(range, entry.date))
+    return (await readDailyHealth(this.userId)).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getSleepSessions(range: DateRange): Promise<SleepSession[]> {
-    return (await readSleep()).filter((entry) => rangeContains(range, entry.date))
+    return (await readSleep(this.userId)).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getRecoveryMetrics(range: DateRange): Promise<RecoveryMetric[]> {
-    return (await readRecovery()).filter((entry) => rangeContains(range, entry.date))
+    return (await readRecovery(this.userId)).filter((entry) => rangeContains(range, entry.date))
   }
 
   async getDataSources(): Promise<DataSourceStatus[]> {
-    return describeAllDataSources(await connectionStates())
+    return describeAllDataSources(await userConnectionStates(this.userId))
   }
 
   async getEarliestRecordDate(): Promise<string | null> {
     const candidates = [
-      ...(await readActivities()).map(activityDayKey),
-      ...(await readDailyHealth()).map((entry) => entry.date),
-      ...(await readSleep()).map((entry) => entry.date),
-      ...(await readRecovery()).map((entry) => entry.date),
+      ...(await readActivities(this.userId)).map(activityDayKey),
+      ...(await readDailyHealth(this.userId)).map((entry) => entry.date),
+      ...(await readSleep(this.userId)).map((entry) => entry.date),
+      ...(await readRecovery(this.userId)).map((entry) => entry.date),
     ]
     return candidates.length === 0
       ? null

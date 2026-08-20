@@ -112,13 +112,20 @@ and `http://localhost:3000/api/auth/wahoo/callback` — they must match exactly.
 WHOOP additionally needs the `offline` scope, or it issues no refresh token; the
 adapter already requests it.
 
-Then *Einstellungen → Datenquellen → Verbinden*, and *Jetzt synchronisieren*
-pulls the last 120 days. Tokens and records land in `data/` (gitignored, written
-with mode 0600); disconnecting deletes both the tokens and that provider's rows.
+Then sign in with WHOOP at *Anmelden*. This opens the normal WHOOP consent screen:
+every WHOOP member receives a separate dashboard account, session, encrypted
+token set and private data store. Wahoo is optionally linked afterwards under
+*Einstellungen → Datenquellen → Verbinden*. *Jetzt synchronisieren* pulls the
+last 120 days; disconnecting deletes that provider's encrypted tokens and rows
+for the current dashboard user only.
 
-Storage lives behind the same `HealthDataRepository`, so `data/index.ts` still
-decides everything: `TRDASHBOARD_DATA_SOURCE` is `local` (default), `mock` for the
-generated demo history, and `supabase` once that repository exists.
+Production uses the private tables from
+`supabase/migrations/20260820062540_multi_user_whoop.sql`. They are protected by
+RLS and have no browser-role grants; only the server-side Supabase service key
+can access them. `TRDASHBOARD_TOKEN_ENCRYPTION_KEY` must contain 32 random bytes
+in Base64 form. `TRDASHBOARD_DATA_SOURCE=local` selects this per-user store;
+`mock` selects generated demo history, and `formline` keeps the legacy personal
+Formline view available during migration.
 
 ### Derived vs. provider metrics
 

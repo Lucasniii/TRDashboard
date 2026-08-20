@@ -12,18 +12,16 @@ const source = process.env.TRDASHBOARD_DATA_SOURCE?.trim().toLowerCase() ?? 'loc
 export const IS_MOCK_DATA = source === 'mock'
 const IS_FORMLINE_DATA = source === 'formline'
 
-let repository: HealthDataRepository | null = null
-
-export function getRepository(): HealthDataRepository {
-  if (repository === null) {
-    repository = IS_MOCK_DATA ? new MockRepository() : IS_FORMLINE_DATA ? new FormlineRepository() : new LocalRepository()
-  }
-  return repository
+export function getRepository(userId?: string): HealthDataRepository {
+  if (IS_MOCK_DATA) return new MockRepository()
+  if (IS_FORMLINE_DATA) return new FormlineRepository()
+  if (userId === undefined) throw new Error('Für diese Seite ist eine Anmeldung erforderlich.')
+  return new LocalRepository(userId)
 }
 
 /** Allows the landing page to distinguish a first run from an empty chart. */
-export async function isEmptyState(): Promise<boolean> {
-  return !IS_MOCK_DATA && (await getRepository().getEarliestRecordDate()) === null
+export async function isEmptyState(userId?: string): Promise<boolean> {
+  return !IS_MOCK_DATA && (await getRepository(userId).getEarliestRecordDate()) === null
 }
 
 export type { HealthDataRepository } from './repository'

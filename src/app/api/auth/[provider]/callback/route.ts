@@ -2,18 +2,18 @@ import { NextResponse } from 'next/server'
 
 import type { ProviderId } from '@/lib/domain/types'
 import { getAdapter } from '@/lib/providers/registry'
+import { createSession, getCurrentUser, sessionCookie, upsertWhoopUser } from '@/lib/auth/session'
 import { consumeState } from '@/lib/store/oauth-state'
-import { saveConnection } from '@/lib/store/tokens'
-import { syncProvider } from '@/lib/sync/run-sync'
+import { saveUserConnection } from '@/lib/store/user-tokens'
+import { whoopAdapter } from '@/lib/providers/whoop'
 
 /**
  * Step two: the provider sends the user back with a code. The code is traded
  * for tokens on the server and stored; the browser only ever sees a redirect.
  *
- * The first sync runs here, before the redirect, so signing in is the only
- * thing the user has to do — they land on a dashboard that already has data.
- * It costs one wait of a few seconds; a sync that fails still counts as a
- * successful connection and says so.
+ * WHOOP creates the dashboard identity. Wahoo is an optional second source and
+ * is attached only to an existing WHOOP session. Syncing happens afterwards so
+ * an OAuth callback always returns before a serverless function times out.
  *
  * Failures are deliberately coarse — `abgebrochen`, `sicherheitspruefung`,
  * `verbindung`. The detail of a token error can quote the request body, so it
@@ -75,7 +75,24 @@ export async function GET(
   try {
     // The redirect URI has to be byte-identical to the one sent in step one.
     const tokens = await adapter.exchangeCode(code, `${base}/api/auth/${provider}/callback`)
-    await saveConnection(provider, tokens)
+    if (provider === 'whoop') {
+      const identity = await whoopAdapter.getIdentity(tokens)
+      const user = await upsertWhoopUser({
+        whoopUserId: identity.id,
+        displayName: identity.displayName,
+        email: identity.email,
+      })
+      await saveUserConnection(user.id, provider, tokens)
+      const sessionToken = await createSession(user.id)
+      const response = NextResponse.redirect(urlWith(base, '/', { verbunden: provider }), 302)
+      response.cookies.set(sessionCookie(sessionToken))
+      return response
+    }
+
+    const user = await getCurrentUser()
+    if (user === null) return failure('anmeldung')
+    await saveUserConnection(user.id, provider, tokens)
+    return NextResponse.redirect(urlWith(base, '/einstellungen', { verbunden: provider }), 302)
   } catch (error) {
     // The provider's own words, minus anything we sent it. A rejected client id
     // or secret is by far the most common cause and deserves its own message,
@@ -87,14 +104,4 @@ export async function GET(
     )
     return failure(badCredentials ? 'zugangsdaten' : 'verbindung')
   }
-
-  // Connected either way from here on: a failed first sync is reported, not
-  // treated as a failed sign-in.
-  const outcome = await syncProvider(provider)
-  const params: Record<string, string> =
-    outcome.status === 'succeeded'
-      ? { verbunden: provider }
-      : { verbunden: provider, abgleich: 'fehlgeschlagen' }
-
-  return NextResponse.redirect(urlWith(base, '/', params), 302)
 }

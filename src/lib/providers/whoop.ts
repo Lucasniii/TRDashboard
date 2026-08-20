@@ -73,6 +73,12 @@ interface WhoopCredentials {
   clientSecret: string
 }
 
+export interface WhoopIdentity {
+  id: string
+  displayName: string | null
+  email: string | null
+}
+
 function readCredentials(): WhoopCredentials {
   const clientId = process.env.WHOOP_CLIENT_ID ?? ''
   const clientSecret = process.env.WHOOP_CLIENT_SECRET ?? ''
@@ -211,9 +217,31 @@ export class WhoopAdapter implements ProviderAdapter {
     return toTokens(response, tokens)
   }
 
-  async fetch(tokens: ProviderTokens, range: DateRange): Promise<ProviderFetchResult> {
+  /** Identifies the account that just granted OAuth access; never exposes it to the client. */
+  async getIdentity(tokens: ProviderTokens): Promise<WhoopIdentity> {
+    const response = await fetch(`${WHOOP_API_BASE}/v1/user/profile`, {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+      cache: 'no-store',
+    })
+    if (!response.ok) throw new Error(`WHOOP-Profil (${response.status}) konnte nicht geladen werden.`)
+    const body = (await response.json()) as Record<string, unknown>
+    const rawId = body.user_id ?? body.id
+    if ((typeof rawId !== 'string' && typeof rawId !== 'number') || String(rawId).trim() === '') {
+      throw new Error('WHOOP hat keine Nutzerkennung zurückgegeben.')
+    }
+    const first = typeof body.first_name === 'string' ? body.first_name.trim() : ''
+    const last = typeof body.last_name === 'string' ? body.last_name.trim() : ''
+    const displayName = [first, last].filter(Boolean).join(' ') || null
+    return {
+      id: String(rawId),
+      displayName,
+      email: typeof body.email === 'string' && body.email.trim() !== '' ? body.email.trim() : null,
+    }
+  }
+
+  async fetch(tokens: ProviderTokens, range: DateRange, userId?: string): Promise<ProviderFetchResult> {
     const params = { start: startOfDayIso(range.from), end: startOfDayIso(range.to) }
-    const ctx: MappingContext = { userId: this.userId, syncedAt: new Date().toISOString() }
+    const ctx: MappingContext = { userId: userId ?? this.userId, syncedAt: new Date().toISOString() }
     const token = tokens.accessToken
 
     // Sequential on purpose: WHOOP rate limits per minute, and four parallel

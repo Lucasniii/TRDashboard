@@ -1,4 +1,4 @@
-// server-only: reads and writes the JSON documents under data/ and must never
+// server-only: reads and writes private Supabase JSON documents and must never
 // be imported from a client component.
 
 import { buildHeartRateZones, buildPowerZones } from '@/components/settings/zone-math'
@@ -12,8 +12,7 @@ import type {
   SyncJob,
   UserSettings,
 } from '@/lib/domain/types'
-import { DEFAULT_USER_ID } from '@/lib/providers/mapping'
-import { readDocument, writeDocument } from './document-store'
+import { readUserDocument, writeUserDocument } from './user-document-store'
 
 /**
  * One JSON document per collection. Records are upserted rather than appended,
@@ -42,18 +41,20 @@ const MAX_SYNC_JOBS = 50
 const DEFAULT_MAX_HEART_RATE = 188
 const DEFAULT_FTP_WATTS = 300
 
-/** Used until the user saves the Einstellungen form for the first time. */
-export const DEFAULT_SETTINGS: UserSettings = {
-  userId: DEFAULT_USER_ID,
-  displayName: 'Lucas',
-  locale: 'de-AT',
-  weeklyGoals: {
-    durationSec: 15 * 3600,
-    distanceM: 400000,
-    elevationGainM: 4000,
-  },
-  heartRateZones: buildHeartRateZones(DEFAULT_MAX_HEART_RATE),
-  powerZones: buildPowerZones(DEFAULT_FTP_WATTS),
+/** Used until an individual user saves the Einstellungen form for the first time. */
+function defaultSettings(userId: string): UserSettings {
+  return {
+    userId,
+    displayName: 'Lucas',
+    locale: 'de-AT',
+    weeklyGoals: {
+      durationSec: 15 * 3600,
+      distanceM: 400000,
+      elevationGainM: 4000,
+    },
+    heartRateZones: buildHeartRateZones(DEFAULT_MAX_HEART_RATE),
+    powerZones: buildPowerZones(DEFAULT_FTP_WATTS),
+  }
 }
 
 interface Sourced {
@@ -91,10 +92,11 @@ function dateKey(row: Dated): string {
 }
 
 async function readCollection<T>(
+  userId: string,
   document: string,
   isValid: (value: unknown) => value is T,
 ): Promise<T[]> {
-  const stored = await readDocument<unknown[]>(document, [])
+  const stored = await readUserDocument<unknown[]>(userId, document, [])
   if (!Array.isArray(stored)) return []
   return stored.filter(isValid)
 }
@@ -104,6 +106,7 @@ async function readCollection<T>(
  * across the caller would lose rows.
  */
 async function upsertCollection<T extends Sourced>(
+  userId: string,
   document: string,
   isValid: (value: unknown) => value is T,
   keyOf: (row: T) => string,
@@ -111,7 +114,7 @@ async function upsertCollection<T extends Sourced>(
 ): Promise<number> {
   if (incoming.length === 0) return 0
   const byKey = new Map<string, T>()
-  for (const row of await readCollection(document, isValid)) {
+  for (const row of await readCollection(userId, document, isValid)) {
     byKey.set(keyOf(row), row)
   }
   let written = 0
@@ -124,7 +127,7 @@ async function upsertCollection<T extends Sourced>(
     byKey.set(key, row)
     written += 1
   }
-  await writeDocument(document, [...byKey.values()])
+  await writeUserDocument(userId, document, [...byKey.values()])
   return written
 }
 
@@ -144,40 +147,40 @@ function isRecovery(value: unknown): value is RecoveryMetric {
   return hasValidDate(value)
 }
 
-export async function readActivities(): Promise<Activity[]> {
-  return readCollection(ACTIVITIES_DOCUMENT, isActivity)
+export async function readActivities(userId: string): Promise<Activity[]> {
+  return readCollection(userId, ACTIVITIES_DOCUMENT, isActivity)
 }
 
-export async function readDailyHealth(): Promise<DailyHealthMetrics[]> {
-  return readCollection(DAILY_HEALTH_DOCUMENT, isDailyHealth)
+export async function readDailyHealth(userId: string): Promise<DailyHealthMetrics[]> {
+  return readCollection(userId, DAILY_HEALTH_DOCUMENT, isDailyHealth)
 }
 
-export async function readSleep(): Promise<SleepSession[]> {
-  return readCollection(SLEEP_DOCUMENT, isSleep)
+export async function readSleep(userId: string): Promise<SleepSession[]> {
+  return readCollection(userId, SLEEP_DOCUMENT, isSleep)
 }
 
-export async function readRecovery(): Promise<RecoveryMetric[]> {
-  return readCollection(RECOVERY_DOCUMENT, isRecovery)
+export async function readRecovery(userId: string): Promise<RecoveryMetric[]> {
+  return readCollection(userId, RECOVERY_DOCUMENT, isRecovery)
 }
 
-export async function upsertActivities(rows: readonly Activity[]): Promise<number> {
-  return upsertCollection(ACTIVITIES_DOCUMENT, isActivity, sourceKey, rows)
+export async function upsertActivities(userId: string, rows: readonly Activity[]): Promise<number> {
+  return upsertCollection(userId, ACTIVITIES_DOCUMENT, isActivity, sourceKey, rows)
 }
 
-export async function upsertDailyHealth(rows: readonly DailyHealthMetrics[]): Promise<number> {
-  return upsertCollection(DAILY_HEALTH_DOCUMENT, isDailyHealth, dateKey, rows)
+export async function upsertDailyHealth(userId: string, rows: readonly DailyHealthMetrics[]): Promise<number> {
+  return upsertCollection(userId, DAILY_HEALTH_DOCUMENT, isDailyHealth, dateKey, rows)
 }
 
-export async function upsertSleep(rows: readonly SleepSession[]): Promise<number> {
-  return upsertCollection(SLEEP_DOCUMENT, isSleep, sourceKey, rows)
+export async function upsertSleep(userId: string, rows: readonly SleepSession[]): Promise<number> {
+  return upsertCollection(userId, SLEEP_DOCUMENT, isSleep, sourceKey, rows)
 }
 
-export async function upsertRecovery(rows: readonly RecoveryMetric[]): Promise<number> {
-  return upsertCollection(RECOVERY_DOCUMENT, isRecovery, dateKey, rows)
+export async function upsertRecovery(userId: string, rows: readonly RecoveryMetric[]): Promise<number> {
+  return upsertCollection(userId, RECOVERY_DOCUMENT, isRecovery, dateKey, rows)
 }
 
 /** Disconnecting a provider removes everything it ever delivered. */
-export async function deleteByProvider(provider: ProviderId): Promise<number> {
+export async function deleteByProvider(userId: string, provider: ProviderId): Promise<number> {
   let removed = 0
   const collections: Array<[string, (value: unknown) => value is Sourced]> = [
     [ACTIVITIES_DOCUMENT, hasValidSource],
@@ -187,26 +190,28 @@ export async function deleteByProvider(provider: ProviderId): Promise<number> {
   ]
   for (const entry of collections) {
     const [document, isValid] = entry
-    const rows = await readCollection(document, isValid)
+    const rows = await readCollection(userId, document, isValid)
     const kept = rows.filter((row) => row.source.provider !== provider)
     if (kept.length === rows.length) continue
     removed += rows.length - kept.length
-    await writeDocument(document, kept)
+    await writeUserDocument(userId, document, kept)
   }
   return removed
 }
 
-export async function readSettings(): Promise<UserSettings> {
-  const stored = await readDocument<UserSettings>(SETTINGS_DOCUMENT, DEFAULT_SETTINGS)
+export async function readSettings(userId: string): Promise<UserSettings> {
+  const defaults = defaultSettings(userId)
+  const stored = await readUserDocument<UserSettings>(userId, SETTINGS_DOCUMENT, defaults)
   if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) {
-    return structuredClone(DEFAULT_SETTINGS)
+    return structuredClone(defaults)
   }
-  return stored
+  return { ...stored, userId }
 }
 
-export async function writeSettings(settings: UserSettings): Promise<UserSettings> {
-  await writeDocument(SETTINGS_DOCUMENT, settings)
-  return settings
+export async function writeSettings(userId: string, settings: UserSettings): Promise<UserSettings> {
+  const privateSettings = { ...settings, userId }
+  await writeUserDocument(userId, SETTINGS_DOCUMENT, privateSettings)
+  return privateSettings
 }
 
 function isSyncJob(value: unknown): value is SyncJob {
@@ -225,23 +230,23 @@ function sortJobs(jobs: SyncJob[]): SyncJob[] {
 }
 
 /** Newest first, capped at the 50 most recent runs. */
-export async function readSyncJobs(): Promise<SyncJob[]> {
-  return sortJobs(await readCollection(SYNC_JOBS_DOCUMENT, isSyncJob)).slice(0, MAX_SYNC_JOBS)
+export async function readSyncJobs(userId: string): Promise<SyncJob[]> {
+  return sortJobs(await readCollection(userId, SYNC_JOBS_DOCUMENT, isSyncJob)).slice(0, MAX_SYNC_JOBS)
 }
 
 /** Also updates a job in place, so a run can go pending -> running -> succeeded. */
-export async function appendSyncJob(job: SyncJob): Promise<void> {
-  const existing = (await readCollection(SYNC_JOBS_DOCUMENT, isSyncJob)).filter((row) => row.id !== job.id)
+export async function appendSyncJob(userId: string, job: SyncJob): Promise<void> {
+  const existing = (await readCollection(userId, SYNC_JOBS_DOCUMENT, isSyncJob)).filter((row) => row.id !== job.id)
   const next = sortJobs([job, ...existing]).slice(0, MAX_SYNC_JOBS)
-  await writeDocument(SYNC_JOBS_DOCUMENT, next)
+  await writeUserDocument(userId, SYNC_JOBS_DOCUMENT, next)
 }
 
 /** Drives the "noch keine Daten" empty state instead of an empty chart. */
-export async function hasAnyRecords(): Promise<boolean> {
+export async function hasAnyRecords(userId: string): Promise<boolean> {
   return (
-    (await readActivities()).length > 0 ||
-    (await readDailyHealth()).length > 0 ||
-    (await readSleep()).length > 0 ||
-    (await readRecovery()).length > 0
+    (await readActivities(userId)).length > 0 ||
+    (await readDailyHealth(userId)).length > 0 ||
+    (await readSleep(userId)).length > 0 ||
+    (await readRecovery(userId)).length > 0
   )
 }

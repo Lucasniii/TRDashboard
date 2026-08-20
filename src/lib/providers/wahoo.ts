@@ -176,10 +176,10 @@ export class WahooAdapter implements ProviderAdapter {
     return toTokens(response, tokens)
   }
 
-  async fetch(tokens: ProviderTokens, range: DateRange): Promise<ProviderFetchResult> {
+  async fetch(tokens: ProviderTokens, range: DateRange, userId?: string): Promise<ProviderFetchResult> {
     const from = startOfDayMs(range.from)
     const to = startOfDayMs(range.to)
-    const ctx: MappingContext = { userId: this.userId, syncedAt: new Date().toISOString() }
+    const ctx: MappingContext = { userId: userId ?? this.userId, syncedAt: new Date().toISOString() }
     const token = tokens.accessToken
 
     const activities: Activity[] = []

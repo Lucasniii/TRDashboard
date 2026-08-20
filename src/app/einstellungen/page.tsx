@@ -8,6 +8,7 @@ import { TrainingZonesCard } from '@/components/settings/training-zones-card'
 import { WeeklyGoalsCard } from '@/components/settings/weekly-goals-card'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/section'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { IS_MOCK_DATA, getRepository } from '@/lib/data'
 
 /**
@@ -33,7 +34,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<SettingsSearchParams>
 }): Promise<ReactElement> {
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
 
   const [settings, dataSources, params] = await Promise.all([
     repository.getSettings(),
@@ -46,7 +47,20 @@ export default async function SettingsPage({
       <PageHeader
         title="Einstellungen"
         subline="Wochenziele, Trainingszonen, Datenquellen und Darstellung"
-        {...(IS_MOCK_DATA ? { action: <Badge tone="warning">Demodaten</Badge> } : {})}
+        action={
+          IS_MOCK_DATA ? (
+            <Badge tone="warning">Demodaten</Badge>
+          ) : (
+            <form action="/api/auth/logout" method="post">
+              <button
+                type="submit"
+                className="rounded-lg border border-border-strong bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface"
+              >
+                Abmelden
+              </button>
+            </form>
+          )
+        }
       />
 
       <ConnectionBanner

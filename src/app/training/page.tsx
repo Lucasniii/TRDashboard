@@ -14,6 +14,7 @@ import {
 } from '@/components/training/data'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/section'
+import { requireDashboardUserId } from '@/lib/auth/require-dashboard-user'
 import { IS_MOCK_DATA, getRepository } from '@/lib/data'
 import { fromDayKey, lastWeekRanges } from '@/lib/date'
 import { formatDateRangeLabel, formatNumber } from '@/lib/format'
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
  * three client panels that only switch between the results they were handed.
  */
 export default async function TrainingPage(): Promise<ReactElement> {
-  const repository = getRepository()
+  const repository = getRepository(await requireDashboardUserId())
   const today = new Date()
   const range = trainingPageRange(today)
 
