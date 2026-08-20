@@ -17,6 +17,12 @@ const TOKEN_URL = `${API_URL}/oauth/token`
 const SCOPES = ['user_read', 'workouts_read', 'offline_data'].join(' ')
 const PAGE_SIZE = 30
 const MAX_PAGES = 20
+/**
+ * Sandbox applications are allowed only 25 API requests per five minutes.
+ * Leave a buffer for OAuth/profile calls and use the workout list even when
+ * there is no budget left for its optional per-workout summary.
+ */
+const MAX_READ_REQUESTS_PER_SYNC = 20
 const EXPIRY_SAFETY_SEC = 60
 
 interface TokenResponse {
@@ -79,7 +85,16 @@ async function get<T>(accessToken: string, path: string, parameters?: Record<str
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   })
-  if (!response.ok) throw new Error(`Wahoo-Anfrage ${path} abgelehnt (${response.status}).`)
+  if (!response.ok) {
+    if (response.status === 429) {
+      const resetSeconds = Number(response.headers.get('x-ratelimit-reset'))
+      const waitMinutes = Number.isFinite(resetSeconds) && resetSeconds > 0
+        ? Math.max(1, Math.ceil(resetSeconds / 60))
+        : 5
+      throw new Error(`Wahoo begrenzt aktuell die Anfragen. Bitte in etwa ${waitMinutes} Minuten erneut synchronisieren (429).`)
+    }
+    throw new Error(`Wahoo-Anfrage ${path} abgelehnt (${response.status}).`)
+  }
   return (await response.json()) as T
 }
 
@@ -161,8 +176,10 @@ export class WahooAdapter implements ProviderAdapter {
       syncedAt: new Date().toISOString(),
     }
     const activities: Activity[] = []
+    let remainingRequests = MAX_READ_REQUESTS_PER_SYNC
 
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
+    for (let page = 1; page <= MAX_PAGES && remainingRequests > 0; page += 1) {
+      remainingRequests -= 1
       const response = await get<WorkoutPage>(tokens.accessToken, '/v1/workouts', {
         page: String(page),
         per_page: String(PAGE_SIZE),
@@ -182,13 +199,13 @@ export class WahooAdapter implements ProviderAdapter {
 
         const summary =
           workout.workout_summary ??
-          (workout.id === null || workout.id === undefined
+          (remainingRequests <= 0 || workout.id === null || workout.id === undefined
             ? null
-            : await this.getWorkoutSummary(tokens.accessToken, String(workout.id)))
+            : (remainingRequests -= 1, await this.getWorkoutSummary(tokens.accessToken, String(workout.id))))
         const activity = wahooWorkoutToActivity({ ...workout, workout_summary: summary }, context)
         if (activity !== null) activities.push(activity)
       }
-      if (reachedHistory) break
+      if (reachedHistory || remainingRequests <= 0) break
     }
 
     return { activities, dailyHealth: [], sleep: [], recovery: [] }
