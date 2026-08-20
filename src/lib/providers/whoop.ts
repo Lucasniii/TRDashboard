@@ -52,6 +52,12 @@ const WHOOP_SCOPES = [
 const PAGE_SIZE = 25
 /** Stops a runaway loop if next_token ever fails to terminate. */
 const MAX_PAGES = 40
+/**
+ * Recovery and the primary sleep are attached to a cycle in API v2. Limit the
+ * first interactive import so it finishes inside a serverless request; later
+ * syncs safely refresh the most recent scored cycles again.
+ */
+const MAX_CYCLES_WITH_DETAILS = 7
 /** Renew a minute early so a request cannot start on an expiring token. */
 const EXPIRY_SAFETY_SEC = 60
 
@@ -155,6 +161,20 @@ async function getPaged<T>(
   return records
 }
 
+/** A live cycle can legitimately have no completed sleep or recovery yet. */
+async function getOptional<T>(accessToken: string, path: string): Promise<T | null> {
+  const response = await fetch(`${WHOOP_API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  })
+  if (response.status === 404) return null
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`WHOOP ${path} (${response.status}): ${text.slice(0, 200)}`)
+  }
+  return (await response.json()) as T
+}
+
 export class WhoopAdapter implements ProviderAdapter {
   readonly id: ProviderId = 'whoop'
   readonly label = 'WHOOP'
@@ -246,10 +266,24 @@ export class WhoopAdapter implements ProviderAdapter {
 
     // Sequential on purpose: WHOOP rate limits per minute, and four parallel
     // paginated walks trip that limit on a first full sync.
-    const recoveryRecords = await getPaged<WhoopRecoveryRecord>(token, '/v2/recovery', params)
-    const sleepRecords = await getPaged<WhoopSleepRecord>(token, '/v2/activity/sleep', params)
     const workoutRecords = await getPaged<WhoopWorkoutRecord>(token, '/v2/activity/workout', params)
     const cycleRecords = await getPaged<WhoopCycleRecord>(token, '/v2/cycle', params)
+
+    // WHOOP v2 associates recovery and the night's sleep with the cycle. The
+    // collection endpoints may omit them for a new application, while these
+    // per-cycle endpoints return the scored records reliably.
+    const recoveryRecords: WhoopRecoveryRecord[] = []
+    const sleepRecords: WhoopSleepRecord[] = []
+    for (const cycle of cycleRecords.slice(0, MAX_CYCLES_WITH_DETAILS)) {
+      const cycleId = cycle.id === null || cycle.id === undefined ? null : String(cycle.id)
+      if (cycleId === null || cycleId.trim() === '') continue
+
+      const recovery = await getOptional<WhoopRecoveryRecord>(token, `/v2/cycle/${encodeURIComponent(cycleId)}/recovery`)
+      if (recovery !== null) recoveryRecords.push(recovery)
+
+      const primarySleep = await getOptional<WhoopSleepRecord>(token, `/v2/cycle/${encodeURIComponent(cycleId)}/sleep`)
+      if (primarySleep !== null) sleepRecords.push(primarySleep)
+    }
 
     // Operational diagnostics only: counts make an empty sync explainable
     // without ever writing a token, user id, or a health record to the log.
