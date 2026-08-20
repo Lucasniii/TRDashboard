@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 
 import { cn } from '@/lib/cn'
+import { missingCredentialsSentence } from '@/lib/runtime'
 import type { ProviderId } from '@/lib/domain/types'
 import { getProviderLabel } from '@/lib/providers/registry'
 
@@ -11,8 +12,7 @@ import { getProviderLabel } from '@/lib/providers/registry'
  */
 
 const ERROR_MESSAGES: Record<string, string> = {
-  'nicht-konfiguriert':
-    'Für diese Quelle fehlen die Zugangsdaten. Trage Client-ID und Secret in .env.local ein und starte den Server neu.',
+  'nicht-konfiguriert': missingCredentialsSentence(),
   abgebrochen: 'Die Anmeldung wurde abgebrochen. Es wurde nichts verbunden.',
   sicherheitspruefung:
     'Die Sicherheitsprüfung ist fehlgeschlagen — der Rückweg passte nicht zur gestarteten Anmeldung. Bitte versuche es noch einmal.',

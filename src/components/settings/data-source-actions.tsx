@@ -42,8 +42,12 @@ export interface DataSourceActionsProps {
   configured: boolean
   /** Set for platforms that already have an adapter; others cannot be connected yet. */
   connectable: boolean
-  /** The two variables the user has to fill in .env.local, named in the hint. */
-  envVars?: readonly [string, string]
+  /**
+   * Ready-made German sentence naming the two variables and where they belong.
+   * Built on the server, because only the server knows whether this instance
+   * runs locally or on a hosting platform.
+   */
+  configHint?: string
 }
 
 export function DataSourceActions({
@@ -52,7 +56,7 @@ export function DataSourceActions({
   connected,
   configured,
   connectable,
-  envVars,
+  configHint,
 }: DataSourceActionsProps): ReactElement {
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
@@ -108,12 +112,8 @@ export function DataSourceActions({
         <button type="button" disabled className={QUIET_BUTTON}>
           Verbinden
         </button>
-        {envVars === undefined ? null : (
-          <p className="max-w-[16rem] text-right text-xs text-ink-muted">
-            Zugangsdaten fehlen: <code className="text-ink-secondary">{envVars[0]}</code> und{' '}
-            <code className="text-ink-secondary">{envVars[1]}</code> in <code>.env.local</code>{' '}
-            eintragen und den Server neu starten.
-          </p>
+        {configHint === undefined ? null : (
+          <p className="max-w-[18rem] text-right text-xs text-ink-muted">{configHint}</p>
         )}
       </div>
     )

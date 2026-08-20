@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { DataSourceActions } from '@/components/settings/data-source-actions'
 import { SyncPanel } from '@/components/settings/sync-panel'
+import { credentialsHint } from '@/lib/runtime'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { DataSourceStatus, ProviderCapabilities, ProviderId } from '@/lib/domain/types'
@@ -123,7 +124,9 @@ export function DataSourcesCard({ sources }: DataSourcesCardProps): ReactElement
                       connected={source.connected}
                       configured={source.configured}
                       connectable={envVars !== undefined}
-                      {...(envVars === undefined ? {} : { envVars })}
+                      {...(envVars === undefined
+                        ? {}
+                        : { configHint: credentialsHint(envVars[0], envVars[1]) })}
                     />
                   </div>
 

@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/ui/section'
 import { getCurrentUser } from '@/lib/auth/session'
 import { cn } from '@/lib/cn'
 import { IS_MOCK_DATA } from '@/lib/data'
+import { credentialsHint, dataSourceHint } from '@/lib/runtime'
 import type { ProviderId } from '@/lib/domain/types'
 import { isProviderConfigured } from '@/lib/providers/registry'
 import { isUserConnected } from '@/lib/store/user-tokens'
@@ -101,8 +102,7 @@ export default async function SignInPage({
               daran nichts.
             </p>
             <p className="text-sm text-ink-secondary">
-              Setze <code>TRDASHBOARD_DATA_SOURCE=local</code> in <code>.env.local</code> und starte den
-              Server neu, damit deine echten Daten angezeigt werden.
+              {dataSourceHint('TRDASHBOARD_DATA_SOURCE')}
             </p>
           </div>
         </Card>
@@ -123,9 +123,7 @@ export default async function SignInPage({
                 <p className="text-sm text-ink-secondary">Liefert {row.delivers}.</p>
                 {row.configured || row.connected ? null : (
                   <p className="text-xs text-ink-muted">
-                    Zugangsdaten fehlen: <code>{row.envVars[0]}</code> und{' '}
-                    <code>{row.envVars[1]}</code> in <code>.env.local</code> eintragen und den
-                    Server neu starten.
+                    {credentialsHint(row.envVars[0], row.envVars[1])}
                   </p>
                 )}
               </div>
