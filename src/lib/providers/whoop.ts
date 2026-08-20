@@ -219,7 +219,7 @@ export class WhoopAdapter implements ProviderAdapter {
 
   /** Identifies the account that just granted OAuth access; never exposes it to the client. */
   async getIdentity(tokens: ProviderTokens): Promise<WhoopIdentity> {
-    const response = await fetch(`${WHOOP_API_BASE}/v1/user/profile`, {
+    const response = await fetch(`${WHOOP_API_BASE}/v1/user/profile/basic`, {
       headers: { Authorization: `Bearer ${tokens.accessToken}` },
       cache: 'no-store',
     })
