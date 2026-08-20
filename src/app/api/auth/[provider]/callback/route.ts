@@ -72,9 +72,18 @@ export async function GET(
     return NextResponse.json({ error: 'Unbekannte Datenquelle.' }, { status: 404 })
   }
 
+  let tokens
   try {
     // The redirect URI has to be byte-identical to the one sent in step one.
-    const tokens = await adapter.exchangeCode(code, `${base}/api/auth/${provider}/callback`)
+    tokens = await adapter.exchangeCode(code, `${base}/api/auth/${provider}/callback`)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : ''
+    const status = /\((\d{3})\)/.exec(detail)?.[1] ?? 'unbekannt'
+    console.error(`OAuth-Token-Tausch fehlgeschlagen: ${provider} — HTTP ${status}`)
+    return failure('verbindung')
+  }
+
+  try {
     if (provider === 'whoop') {
       const identity = await whoopAdapter.getIdentity(tokens)
       const user = await upsertWhoopUser({
@@ -93,15 +102,10 @@ export async function GET(
     if (user === null) return failure('anmeldung')
     await saveUserConnection(user.id, provider, tokens)
     return NextResponse.redirect(urlWith(base, '/einstellungen', { verbunden: provider }), 302)
-  } catch (error) {
-    // The provider's own words, minus anything we sent it. A rejected client id
-    // or secret is by far the most common cause and deserves its own message,
-    // because "connection failed" sends people hunting the redirect URI instead.
-    const detail = error instanceof Error ? error.message : ''
-    const badCredentials = /invalid_client|unauthorized_client|\(401\)|\(403\)/i.test(detail)
-    console.error(
-      `OAuth-Rückruf fehlgeschlagen: ${provider} — ${badCredentials ? 'Zugangsdaten abgelehnt' : 'Token-Tausch fehlgeschlagen'}`,
-    )
-    return failure(badCredentials ? 'zugangsdaten' : 'verbindung')
+  } catch {
+    // This covers the profile lookup, private token encryption and session
+    // creation. None of those details or provider responses reach the browser.
+    console.error(`OAuth-Konto konnte nicht eingerichtet werden: ${provider}`)
+    return failure('verbindung')
   }
 }

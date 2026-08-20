@@ -43,7 +43,9 @@ async function readEntries(now: number): Promise<StateEntry[]> {
 /** Random, single-use, persisted with its issue time. */
 export async function createState(provider: ProviderId): Promise<string> {
   const now = Date.now()
-  const state = randomBytes(32).toString('base64url')
+  // WHOOP's OAuth implementation requires an eight-character state value.
+  // Six random bytes encode to exactly eight Base64URL characters (48 bits).
+  const state = randomBytes(6).toString('base64url')
   // Pruning happens on every write, so an abandoned flow cannot pile up.
   const entries = await readEntries(now)
   entries.push({ provider, state, createdAt: now })
